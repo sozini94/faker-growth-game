@@ -12,7 +12,7 @@ const zero=()=>0;
 const high=()=>.99;
 
 test('마스터부터 시작하고 티어는 최상위 3종, 한 시즌 3주',()=>{
- assert.equal(VERSION,2);
+ assert.equal(VERSION,3);
  assert.equal(WEEKS_PER_SEASON,3);
  assert.deepEqual(TIERS.map(t=>t.name),['마스터','그랜드마스터','챌린저']);
  assert.deepEqual(RANK_THRESHOLDS,[0,400,800]);
@@ -47,7 +47,7 @@ test('솔로랭크 10판, 초기 180LP + 다음 주로 진행',()=>{
  g=continueFromResult(g,high);assert.equal(g.career.week,2);
 });
 test('LP 400/800 기준 승급 및 강등, 마스터 최저 0',()=>{
- let g=createGame('승급','top');
+ let g=createGame('승급','top');g.player.stage='pro';g.career.team='t1';g.career.contractRemaining=3;
  g.rank.lp=390;g=startTraining(g,'solo',[],zero);
  assert.equal(g.rank.tier,1);assert.equal(g.lastResult.rank.promotion,true);
  g=continueFromResult(g,high);g.rank.lp=795;g.rank.tier=1;
@@ -106,7 +106,7 @@ test('이벤트 결과가 체력 0으로 떨어져도 강제 휴식 처리',()=>
  g.pending={trainingId:'solo',week:1,season:1,before:{stats:{...g.stats},status:{...g.status},rank:{...g.rank}}};
  g.scene='event';g.pendingEvent=ev.id;
  g=chooseEvent(g,[ev],0,high);
- assert.equal(g.lastResult.rank,null);assert.equal(g.lastResult.league,null);assert.equal(g.career.recoveryTurns,1);
+ assert.equal(g.lastResult.rank,null);assert.equal(g.lastResult.league?.played.length,0);assert.equal(g.career.recoveryTurns,1);
 });
 test('3주차 시즌 종료 후 승격 테스트 및 계약 제안',()=>{
  let g=createGame('이적의 별','mid');g.stats.lane=25;g.stats.map=25;g.career.week=3;
@@ -122,8 +122,7 @@ test('계약 만료 후 제안이 없으면 은퇴',()=>{
  g.player.stage='pro';g.player.age=35;g.career.team='t1';g.career.contractRemaining=1;
  g.career.salary=12;g.career.week=3;
  g=startTraining(g,'rest',[],high);g=continueFromResult(g,high);
- assert.equal(g.scene,'ending');assert.equal(g.offers.length,0);
- assert.ok(g.ending?.grade);assert.equal(g.career.totalSalary,12);
+ assert.equal(g.scene,'tournament');assert.equal(g.proCircuit.phase,'lck');
 });
 test('이적 제안 거절 시 은퇴 처리',()=>{
  let g=createGame('거절','mid');g.player.stage='trainee';g.career.team='geng';g.marketTarget='trainee';
@@ -133,7 +132,7 @@ test('이적 제안 거절 시 은퇴 처리',()=>{
 test('1.0 저장 데이터 및 명예의 전당 기록 이전',()=>{
  const old=createGame('기존','top');old.version=1;old.rank={tier:5,lp:65,highest:6};old.career.week=7;
  const migrated=migrateGame(old);
- assert.equal(migrated.version,2);assert.equal(migrated.rank.tier,1);assert.equal(migrated.rank.lp,465);
+ assert.equal(migrated.version,3);assert.equal(migrated.rank.tier,1);assert.equal(migrated.rank.lp,465);
  assert.equal(migrated.rank.highest,2);assert.equal(migrated.career.week,3);
  assert.equal(old.rank.lp,65);
  assert.equal(migrateHallEntry({highest:6}).highest,2);

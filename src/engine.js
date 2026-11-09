@@ -1,5 +1,6 @@
+import {initProCircuit,ensureProCircuit,runProWeek,finishProPhase,advanceProPhase,PRO_PHASES,PHASE_NAMES} from './tournaments.js';
 /** 게임 규칙/상태 변경만 담당하는 모듈. DOM과 localStorage에 의존하지 않습니다. */
-export const VERSION = 2;
+export const VERSION = 3;
 export const WEEKS_PER_SEASON = 3;
 export const RANK_THRESHOLDS = [0,400,800];
 export const TIERS = [
@@ -45,6 +46,57 @@ export const TEAMS = [
   {id:'dn',name:'DN SOOPers',short:'DNS',color:'#8fcbff',logo:leaguepedia('DN SOOPerslogo profile.png')},
   {id:'bro',name:'HANJIN BRION',short:'BRO',color:'#b5e3ab',logo:leaguepedia('HANJIN BRIONlogo profile.png')},
 ];
+
+// 2026 LCK Season 최종 순위: Gen.G, HLE, T1, DK, KT, BFX, NS, BRO, DRX, DN.
+// 근거: leaguelab.cc 2026 LCK 정규/플레이오프 및 trixcity.lol 2026 final standings.
+// 순위 스냅샷으로, 구단의 실제 영입 의사와는 무관합니다.
+export const LCK_2026_STANDINGS=[
+  {teamId:'geng',place:1},{teamId:'hle',place:2},{teamId:'t1',place:3},
+  {teamId:'dk',place:4},{teamId:'kt',place:5},{teamId:'bnk',place:6},
+  {teamId:'ns',place:7},{teamId:'bro',place:8},{teamId:'drx',place:9},{teamId:'dn',place:10},
+];
+const STAGE_ORDER={student:0,trainee:1,academy:2,pro:3};
+/** 순위는 구단 수준, LP/능력치는 선수 수준을 결정하는 게임 규칙입니다. */
+export function scoutingOffers(g,rng=Math.random,{renewal=false}={}) {
+  const lp=g.rank.lp,power=averageStats(g),v=marketValue(g);
+  const current=STAGE_ORDER[g.player.stage]??0;
+  const offers=[];
+  const eligible=(stage)=>renewal?stage==='pro':STAGE_ORDER[stage]>current;
+  const add=(teamId,stage)=>{
+    if(!eligible(stage)||offers.some(o=>o.teamId===teamId))return;
+    const teamPlace=LCK_2026_STANDINGS.find(t=>t.teamId===teamId)?.place||10;
+    const base=stage==='pro'?12:stage==='academy'?3:1;
+    const salary=Math.round((base+(11-teamPlace)*base*.13+v*base*.012)*10)/10;
+    offers.push({id:'offer_'+g.career.season+'_'+g.career.week+'_'+teamId+'_'+stage,
+      teamId,targetStage:stage,place:teamPlace,seasons:roll(rng,1,3),salary,
+      flavor:stage==='pro'?'1군 주전 경쟁 기회를 제안합니다.':stage==='academy'?'2군 핵심 전력으로 성장할 선수를 찾습니다.':'연습생 육성 프로젝트에 합류해 주세요.'});
+  };
+  // 챌린저 800LP에 도달하면 상위 세 팀에서 1군 입단 테스트 제안이 확정됩니다.
+  if(lp>=800){['geng','hle','t1'].forEach(id=>add(id,'pro'));}
+  // 상위권 그랜드마스터는 중상위 팀에서 1군, 그 밖에는 2군 제안.
+  if(lp>=650 && power>=23){['dk','kt'].forEach(id=>add(id,'pro'));}
+  if(lp>=400){['bnk','ns','bro'].forEach(id=>add(id,'academy'));}
+  if(lp>=250 && power>=18){['drx','dn'].forEach(id=>add(id,'academy'));}
+  // 마스터 구간에서는 연습생이 기본이지만, 능력치가 높으면 2군까지 도전합니다.
+  if(lp>=100 || power>=18){['drx','dn','bro'].forEach(id=>add(id,'trainee'));}
+  if(renewal){
+    // 1군 계약 만료 시 기존 성적/시장가치까지 반영합니다.
+    if(v>=25){['dk','kt','bnk','ns','bro','drx','dn'].forEach(id=>add(id,'pro'));}
+    if(v>=15&&g.career.team)add(g.career.team,'pro');
+  }
+  return offers.sort((a,b)=>a.place-b.place).slice(0,8);
+}
+function openScouting(g,rng,{renewal=false}={}){
+  const proposals=scoutingOffers(g,rng,{renewal});
+  if(!proposals.length){
+    if(renewal)return retire(g,'계약이 종료되었지만 새로운 1군 영입 제안이 도착하지 않았다.');
+    g.scene='main';return g;
+  }
+  const highest=proposals.reduce((best,o)=>STAGE_ORDER[o.targetStage]>STAGE_ORDER[best]?o.targetStage:best,proposals[0].targetStage);
+  g.pendingGate={fromStage:g.player.stage,toStage:highest,offers:proposals,renewal};
+  g.scene='gate';return g;
+}
+
 export const STAGES = [
   {id:'student',name:'학생',next:'trainee',gateTier:0,gatePower:15},
   {id:'trainee',name:'연습생',next:'academy',gateTier:0,gatePower:22},
@@ -90,7 +142,7 @@ export function createGame(name,position='mid') {
     career:{season:1,week:1,totalTurns:0,team:null,contractRemaining:0,salary:0,totalSalary:0,
       matchWins:0,matchLosses:0,championships:0,rankWins:0,rankLosses:0,marketValue:45,
       teamHistory:[],scoreLog:[],slumpRecovered:0,injuryTurns:0,injuries:0,gateFailures:0,recoveryTurns:0,recoveryReason:null},
-    pending:null,pendingEvent:null,pendingGate:null,offers:[],marketTarget:null,lastResult:null,ending:null,history:[],
+    proCircuit:null,pending:null,pendingEvent:null,pendingGate:null,offers:[],marketTarget:null,marketMandatory:false,lastResult:null,ending:null,history:[],
     createdAt:new Date().toISOString(),
   };
 }
@@ -164,10 +216,10 @@ function simulateSolo(g,rng) {
   const beforeTier=g.rank.tier,beforeLp=g.rank.lp;
   let wins=0,losses=0;
   for(let i=0;i<10;i++) {
-    const opponent=13+g.rank.tier*10+g.rank.lp*.028;
+    const opponent=13+g.rank.tier*10+g.rank.lp*.032;
     const win=rng()<winChance(scorePower(g),opponent,g.status.condition);
-    if(win){wins++;g.career.rankWins++;updateRank(g,roll(rng,40,90));}
-    else {losses++;g.career.rankLosses++;updateRank(g,-roll(rng,20,40));}
+    if(win){wins++;g.career.rankWins++;updateRank(g,roll(rng,18,22));}
+    else {losses++;g.career.rankLosses++;updateRank(g,-roll(rng,15,19));}
   }
   const promotion=g.rank.tier>beforeTier, demotion=g.rank.tier<beforeTier;
   if(wins>=7)changeEffects(g,{popularity:2});
@@ -177,6 +229,20 @@ function simulateSolo(g,rng) {
 }
 function simulateLeague(g,rng) {
   if(g.player.stage==='student')return null;
+  if(g.player.stage==='pro'){
+    const pro=runProWeek(g,rng,scorePower(g));
+    const games=pro.played||[];
+    for(const match of games){
+      g.career.scoreLog.push(match.victory?1:0);
+      if(match.victory){g.career.matchWins++;changeEffects(g,{popularity:2,teamwork:1,condition:-1});}
+      else{g.career.matchLosses++;changeEffects(g,{popularity:-1,condition:-2});}
+    }
+    g.career.scoreLog=g.career.scoreLog.slice(-20);
+    return {pro:true,...pro,enemyId:games.at(-1)?.enemyId||null,
+      victory:games.length?games.filter(x=>x.victory).length>=Math.ceil(games.length/2):null,
+      score:games.length?`${games.filter(x=>x.victory).length}승 ${games.filter(x=>!x.victory).length}패`:'국제 대회 준비',
+      mvp:false};
+  }
   const opponents=TEAMS.filter(t=>t.id!==g.career.team);
   const enemy=opponents[Math.floor(rng()*opponents.length)]||TEAMS[1];
   const stageIndex=STAGES.findIndex(s=>s.id===g.player.stage);
@@ -218,24 +284,20 @@ export function startTraining(state,trainingId,events=[],rng=Math.random) {
   const forcedRecovery=g.career.recoveryTurns>0||g.status.stamina<=0||g.status.condition<=0;
   g.pending={trainingId,week:g.career.week,season:g.career.season,forcedRecovery,
     before:{stats:copy(g.stats),status:copy(g.status),rank:copy(g.rank)},eventName:null};
-  const effects = {...tr.effects};
-
-  if (trainingId === 'solo') {
-      effects.lane = roll(rng, 3, 6);
-      effects.fight = roll(rng, 2, 4);
-
-  } else if (trainingId === 'study') {
-      effects.map = roll(rng, 3, 6);
-      effects.champ = roll(rng, 2, 4);
-
-  } else if (trainingId === 'team') {
-      effects.fight = roll(rng, 3, 6);
-
-  } else if (trainingId === 'rest') {
-      effects.mental = roll(rng, 1, 2);
+  // 훈련 실행할 때마다 랜덤한 성장값을 한 번씩 추첨합니다.
+  const randomEffects={...tr.effects};
+  if(trainingId==='solo'){
+    randomEffects.lane=roll(rng,3,6);
+    randomEffects.fight=roll(rng,2,4);
+  }else if(trainingId==='study'){
+    randomEffects.map=roll(rng,3,6);
+    randomEffects.champ=roll(rng,2,4);
+  }else if(trainingId==='team'){
+    randomEffects.fight=roll(rng,3,6);
+  }else if(trainingId==='rest'){
+    randomEffects.mental=roll(rng,1,2);
   }
-
-  changeEffects(g, effects);
+  changeEffects(g,randomEffects);
   // 나이 보정과 스탯 상한을 적용한 실제 훈련 성장량.
   g.pending.trainingGains=Object.fromEntries(playerKeys.map(key=>[
     key,Math.round((g.stats[key]-g.pending.before.stats[key])*10)/10
@@ -277,7 +339,7 @@ function concludeTraining(g,rng) {
   const skipMatches=exhausted || Boolean(g.pending.forcedRecovery);
   const reason=exhausted?g.career.recoveryReason:g.pending.forcedRecovery?'강제 회복 주간에는 경기 출전 없이 휴식합니다.':null;
   const rankResult=skipMatches?null:g.pending.trainingId==='solo'?simulateSolo(g,rng):null;
-  const leagueResult=skipMatches?null:simulateLeague(g,rng);
+  const leagueResult=skipMatches?(g.player.stage==='pro'?runProWeek(g,rng,10,true):null):simulateLeague(g,rng);
   // 경기 종료 후 0에 도달한 경우 다음 턴 강제 휴식으로 연결.
   if(!skipMatches)markExhaustion(g);
   if(g.career.injuryTurns>0)g.career.injuryTurns=Math.max(0,g.career.injuryTurns-1);
@@ -298,8 +360,7 @@ function concludeTraining(g,rng) {
   g.pending=null;g.scene='result';
 }
 export function gateEligibility(g) {
-  const stage=stageInfo(g.player.stage);
-  return Boolean(stage.next&&g.rank.tier>=stage.gateTier&&averageStats(g)>=stage.gatePower);
+ return scoutingOffers(g,()=>0.5).length>0;
 }
 function ageSeason(g) {
   if(g.player.age>=26){ const loss=g.player.age>=29?2:1;g.stats.lane=clamp(g.stats.lane-loss);g.stats.fight=clamp(g.stats.fight-loss); }
@@ -314,48 +375,85 @@ function seasonAchievements(g,rng) {
   } else g.career.seasonAward=false;
 }
 export function continueFromResult(state,rng=Math.random) {
-  if(state.scene!=='result')throw Error('경기 결과 화면이 아닙니다.');
-  const g=copy(state);
-  g.career.totalTurns++;
-  if(g.career.week<WEEKS_PER_SEASON){g.career.week++;g.scene='main';return g;}
-  // 4주 종료: 시즌 결산, 연봉 정산, 노화, 다음 시즌
-  seasonAchievements(g,rng);
-  if(g.career.team&&g.career.contractRemaining>0) {
-    g.career.totalSalary+=g.career.salary;
-    g.career.contractRemaining--;
+ if(state.scene!=='result')throw Error('경기 결과 화면이 아닙니다.');
+ const g=copy(state);g.career.totalTurns++;
+ const seasonEnd=g.career.week>=WEEKS_PER_SEASON;
+ if(!seasonEnd){
+  g.career.week++;
+  if(g.player.stage!=='pro'){
+   const proposals=scoutingOffers(g,()=>0.5);
+   if(proposals.length)return openScouting(g,rng);
   }
-  ageSeason(g);
-  g.career.season++;g.career.week=1;
-  changeEffects(g,{stamina:12,condition:8});
-  syncValue(g);
-  if(gateEligibility(g) && (g.player.stage==='student'||g.career.contractRemaining<=0)) {
-    g.pendingGate={fromStage:g.player.stage,toStage:stageInfo(g.player.stage).next};
-    g.scene='gate';return g;
-  }
-  if(g.player.stage!=='student' && g.career.contractRemaining<=0){return prepareMarket(g,g.player.stage,rng);}
-  if(g.player.stage==='student' && g.career.marketValue<5) return retire(g,'시장가치가 바닥나 스카우트 제안을 더 이상 기대할 수 없게 되었다.');
   g.scene='main';return g;
+ }
+ if(g.player.stage==='pro'){
+  // 각 3주 시즌이 끝날 때 LCK / MSI / Worlds의 결산 화면을 보여줍니다.
+  const t=ensureProCircuit(g);
+  const report=finishProPhase(g,rng,scorePower(g));
+  if(t.phase==='msi'){
+   if(report.lckChampion===g.career.team){
+    g.career.championships++;t.lckTitles++;
+    changeEffects(g,{popularity:10,teamwork:5});
+   }
+  }
+  if(report.won){changeEffects(g,{popularity:13,teamwork:5});}
+  g.scene='tournament';return g;
+ }
+ seasonAchievements(g,rng);
+ if(g.career.team&&g.career.contractRemaining>0){g.career.totalSalary+=g.career.salary;g.career.contractRemaining--;}
+ ageSeason(g);g.career.season++;g.career.week=1;
+ changeEffects(g,{stamina:12,condition:8});syncValue(g);
+ const proposals=scoutingOffers(g,()=>0.5);
+ if(proposals.length)return openScouting(g,rng);
+ if(g.player.stage!=='student'&&g.career.contractRemaining<=0)
+  return retire(g,'계약이 만료되었고 새로운 영입 제안이 도착하지 않았다.');
+ g.scene='main';return g;
 }
+/** 대회 결과를 읽고 다음 3주 대회로 진행합니다. 연속 Worlds 4회 우승이면 특별 엔딩입니다. */
+export function continueFromTournament(state,rng=Math.random) {
+ if(state.scene!=='tournament'||state.player.stage!=='pro')throw Error('대회 결산 화면이 아닙니다.');
+ const g=copy(state),t=ensureProCircuit(g);
+ if(t.phase==='worlds'&&t.worldsStreak>=4)return retire(g,'Worlds 4년 연속 우승! 당신은 새로운 페이커가 되었습니다.');
+ const yearEnded=t.phase==='worlds';
+ advanceProPhase(g);
+ if(yearEnded){
+   // 프로 선수 계약은 1~3년(한 해: LCK/MSI/Worlds 3시즌) 단위로 감소.
+   if(g.career.team&&g.career.contractRemaining>0){g.career.totalSalary+=g.career.salary;g.career.contractRemaining--;}
+   if(g.player.age>=26){const loss=g.player.age>=29?2:1;g.stats.lane=clamp(g.stats.lane-loss);g.stats.fight=clamp(g.stats.fight-loss);}
+   g.player.age++;
+ }
+ g.career.season++;g.career.week=1;
+ changeEffects(g,{stamina:12,condition:8});syncValue(g);
+ if(yearEnded&&g.career.contractRemaining<=0)return openScouting(g,rng,{renewal:true});
+ g.scene='main';return g;
+}
+
 export function chooseGate(state,option,rng=Math.random) {
-  if(state.scene!=='gate'||!state.pendingGate)throw Error('진행 중인 승격 테스트가 없습니다.');
-  const g=copy(state);const gate=g.pendingGate;
-  if(option==='skip'){
-    g.pendingGate=null;
-    return gate.fromStage==='student'?(g.scene='main',g):prepareMarket(g,gate.fromStage,rng);
-  }
-  const p=scorePower(g);
-  let prob=Math.min(.93,Math.max(.22,.46+(p-stageInfo(gate.fromStage).gatePower)*.023+(g.status.condition-50)*.004));
-  if(option==='teamwork'){if(g.status.teamwork<20)throw Error('팀워크 20 이상이 필요합니다.');prob=Math.min(.95,Math.max(.22,prob+.12));}
-  if(option==='focus')changeEffects(g,{stamina:-10,condition:-6});
+ if(state.scene!=='gate'||!state.pendingGate)throw Error('진행 중인 입단 테스트가 없습니다.');
+ const g=copy(state),gate=g.pendingGate;
+ if(option==='skip'){
   g.pendingGate=null;
-  if(rng()<prob) {
-    g.career.gateMessage=`${stageInfo(gate.toStage).name} 승격 테스트에 합격했습니다!`;
-    return prepareMarket(g,gate.toStage,rng);
-  }
-  g.career.gateFailures++;
-  g.career.gateMessage='테스트에 실패했습니다. 다음 기회를 노려보세요.';
-  if(gate.fromStage==='student'){g.scene='main';return g;}
-  return prepareMarket(g,gate.fromStage,rng);
+  if(gate.renewal)return retire(g,'계약 만료 후 입단 테스트를 포기했습니다.');
+  g.scene='main';return g;
+ }
+ let prob=Math.min(.95,Math.max(.35,.65+(g.rank.lp/800)*.2+(averageStats(g)-20)*.005));
+ if(option==='teamwork'){
+  if(g.status.teamwork<20)throw Error('팀워크 20 이상이 필요합니다.');
+  prob=Math.min(.98,prob+.1);
+ }
+ if(option==='focus')changeEffects(g,{stamina:-10,condition:-6});
+ // 챌린저는 상위 세 팀의 1군 영입 테스트를 항상 통과하도록 합니다.
+ const passed=g.rank.lp>=800||rng()<prob;
+ g.pendingGate=null;
+ if(passed){
+  g.offers=gate.offers||scoutingOffers(g,rng,{renewal:Boolean(gate.renewal)});
+  g.marketTarget=gate.toStage;g.marketMandatory=Boolean(gate.renewal);
+  g.scene='market';g.career.gateMessage='테스트 합격! 현재 LP와 실력에 맞는 영입 제안이 도착했습니다.';
+  return g;
+ }
+ g.career.gateFailures++;g.career.gateMessage='입단 테스트에서 탈락했습니다. 다음 주 또는 다음 시즌에 재도전하세요.';
+ if(gate.renewal)return retire(g,'계약 만료 후 입단 테스트에 실패하여 소속팀을 찾지 못했습니다.');
+ g.scene='main';return g;
 }
 function offersFor(g,target,rng) {
   const v=marketValue(g);
@@ -388,18 +486,25 @@ export function acceptOffer(state,offerId) {
   const offer=state.offers.find(x=>x.id===offerId);
   if(!offer)throw Error('해당 제안이 없습니다.');
   const g=copy(state);
+  const enteringPro=g.player.stage!=='pro'&&offer.targetStage==='pro';
   g.player.stage=offer.targetStage;g.career.team=offer.teamId;
+  if(enteringPro){g.proCircuit=initProCircuit(g);g.career.week=1;}
   g.career.contractRemaining=offer.seasons;g.career.salary=offer.salary;
   g.career.teamHistory.push({teamId:offer.teamId,stage:offer.targetStage,season:g.career.season,years:offer.seasons});
-  g.offers=[];g.marketTarget=null;g.scene='main';g.career.gateMessage=`${$team(offer.teamId).name}에 입단했습니다!`;
+  g.offers=[];g.marketTarget=null;g.marketMandatory=false;g.scene='main';g.career.gateMessage=`${$team(offer.teamId).name}에 입단했습니다!`;
   changeEffects(g,{popularity:3,teamwork:5,condition:5});syncValue(g);
   return g;
 }
 export function rejectOffer(state,offerId) {
-  if(state.scene!=='market')throw Error('이적 시장 화면이 아닙니다.');
-  const g=copy(state);g.offers=g.offers.filter(o=>o.id!==offerId);
-  if(!g.offers.length)return retire(g,'모든 제안을 거절했고, 남은 계약이 없어 은퇴하게 되었다.');
-  return g;
+ if(state.scene!=='market')throw Error('이적 시장 화면이 아닙니다.');
+ const g=copy(state);g.offers=g.offers.filter(o=>o.id!==offerId);
+ if(!g.offers.length){
+  if(g.marketMandatory|| (g.player.stage!=='student'&&g.career.contractRemaining<=0))
+   return retire(g,'모든 영입 제안을 거절했고, 계약이 없어 은퇴하게 되었다.');
+  g.scene='main';g.marketTarget=null;g.marketMandatory=false;
+  g.career.gateMessage='이번 영입 제안을 모두 거절했습니다. 기존 커리어를 계속합니다.';
+ }
+ return g;
 }
 export function careerScore(g) {
   return Math.round(g.rank.highest*90 + g.career.championships*130 + g.career.matchWins*5 +
@@ -407,12 +512,13 @@ export function careerScore(g) {
 }
 export function careerGrade(g) {
   const sc=careerScore(g);
+  if(g.proCircuit?.worldsStreak>=4)return'FAKER';
   if(sc>=1200)return'GOAT';if(sc>=750)return'레전드';if(sc>=430)return'스타';if(sc>=160)return'준수';return'무명';
 }
 export function retire(state,reason) {
   const g=copy(state);
   g.scene='ending';g.offers=[];g.pendingGate=null;g.pendingEvent=null;
-  g.ending={reason,score:careerScore(g),grade:careerGrade(g),path:g.status.popularity>=75?'방송인':g.stats.mental>=45?'감독':'코치',
+  g.ending={reason,score:careerScore(g),grade:careerGrade(g),worldsWins:g.proCircuit?.worldsWins||0,worldsStreak:g.proCircuit?.worldsStreak||0,path:g.status.popularity>=75?'방송인':g.stats.mental>=45?'감독':'코치',
     oneLiner:g.career.slumpRecovered>0?`슬럼프를 ${g.career.slumpRecovered}번 이겨내고 끝까지 도전을 멈추지 않은 선수.`:
       g.career.championships>0?'치열한 경기 끝에 우승의 기쁨을 맛본 선수.':'새로운 도전 앞에서 매번 자신만의 답을 찾은 선수.'};
   return g;
@@ -423,7 +529,7 @@ export function hallEntry(g) {
     date:new Date().toISOString(),name:g.player.name,position:g.player.position,age:g.player.age,
     grade:g.ending?.grade||careerGrade(g),score:g.ending?.score||careerScore(g),
     highest:g.rank.highest,version:VERSION,stage:g.player.stage,trophies:g.career.championships,team:g.career.team,
-    salary:g.career.totalSalary,
+    salary:g.career.totalSalary,worldsWins:g.proCircuit?.worldsWins||0,worldsStreak:g.proCircuit?.worldsStreak||0,
   };
 }
 export function formatMoney(amount) {return `${Number(amount||0).toLocaleString('ko-KR',{maximumFractionDigits:1})}억 원`;}
@@ -437,6 +543,12 @@ export function migrateGame(raw) {
     g.career.week=WEEKS_PER_SEASON;
     if(g.pending?.week>WEEKS_PER_SEASON)g.pending.week=WEEKS_PER_SEASON;
     if(g.lastResult?.week>WEEKS_PER_SEASON)g.lastResult.week=WEEKS_PER_SEASON;
+    return g;
+  }
+  if(raw.version===2){
+    const g=copy(raw);g.version=VERSION;
+    if(g.player.stage==='pro')ensureProCircuit(g);
+    if(g.career.week>WEEKS_PER_SEASON)g.career.week=WEEKS_PER_SEASON;
     return g;
   }
   if(raw.version!==1)return null;
@@ -458,10 +570,11 @@ export function migrateGame(raw) {
     r.beforeLp=([0,400,800][r.beforeTier]||0)+(oldTier>=4?Number(r.beforeLp)||0:0);
     r.afterLp=g.rank.lp;
   }
-  g.version=VERSION;return g;
+  g.version=VERSION; if(g.player.stage==='pro')ensureProCircuit(g);return g;
 }
 export const migrateHallEntry = entry => {
   if(!entry||typeof entry!=='object')return entry;
   if(entry.version===VERSION)return entry;
+  if(entry.version===2)return {...entry,version:VERSION,worldsWins:entry.worldsWins||0};
   return {...entry,highest:entry.highest>=6?2:entry.highest===5?1:0,version:VERSION};
 };

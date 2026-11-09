@@ -1,7 +1,7 @@
 {
   "name": "faker-growth-sim",
   "private": true,
-  "version": "2.0.0",
+  "version": "4.0.0",
   "type": "module",
   "description": "픽셀아트 기반 e스포츠 선수 육성 시뮬레이션",
   "scripts": {

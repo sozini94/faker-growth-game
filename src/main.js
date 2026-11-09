@@ -1,11 +1,12 @@
 const EVENTS = await fetch('/src/data/events.json').then(r=>{if(!r.ok)throw Error('이벤트 데이터를 불러오지 못했습니다.');return r.json();});
 import {
-  VERSION,TIERS,STATS,POSITIONS,TEAMS,STAGES,TRAININGS,WEEKS_PER_SEASON,rankProgress,migrateGame,migrateHallEntry,
+  VERSION,TIERS,STATS,POSITIONS,TEAMS,LCK_2026_STANDINGS,STAGES,TRAININGS,WEEKS_PER_SEASON,rankProgress,migrateGame,migrateHallEntry,
   createGame,startTraining,chooseEvent,continueFromResult,chooseGate,
   acceptOffer,rejectOffer,stageInfo,positionInfo,teamInfo,tierInfo,
   seasonName,scorePower,averageStats,marketValue,meetsRequirements,
-  isTrainingUnlocked,formatMoney,hallEntry
+  isTrainingUnlocked,formatMoney,hallEntry,continueFromTournament
 } from './engine.js';
+import {PHASE_NAMES} from './tournaments.js';
 
 const APP_KEY='faker_growth_v1';
 const HALL_KEY='faker_growth_hall_v1';
@@ -37,7 +38,7 @@ let notice='';
 
 const h=val=>String(val??'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const img=name=>`/assets/${name}`;
-const seasonLabel=g=>`${Math.ceil(g.career.season/2)}년차 ${seasonName(g.career.season)}`;
+const seasonLabel=g=>g.player.stage==='pro'&&g.proCircuit?`${g.proCircuit.year}년차 · ${PHASE_NAMES[g.proCircuit.phase]}`:`${Math.ceil(g.career.season/2)}년차 ${seasonName(g.career.season)}`;
 const teamLogo=(id,small=false)=>{const t=teamInfo(id);return `<span class="team-logo ${small?'mini':''}" style="--team:${t.color}" title="${h(t.name)}"><img src="/assets/branding/team-${t.id}.${['t1','geng','hle','dk'].includes(t.id)?'svg':'png'}" data-remote="${h(t.logo)}" alt="${h(t.name)} 팀 로고" loading="lazy" onerror="brandFallback(this)"/><span class="team-logo-fallback" aria-hidden="true">${h(t.short)}</span></span>`};
 const classForTier=n=>`tier-${TIERS[n]?.id||'iron'}`;
 const rangecolor=(n)=>n<28?'#f16a79':n<50?'#f3b75b':'#52e1c2';
@@ -76,7 +77,7 @@ function shell(content,screen=''){
    <div class="header-side"><span class="saving"><i></i> 자동 저장</span><button data-action="help" class="icon-button" aria-label="게임 안내" title="게임 안내">?</button></div>
   </header>
   <main>${content}</main>
-  <footer class="footer"><span>FAKER GROWTH SIM · FAN MADE PIXEL GAME</span><span>v2.0</span></footer>
+  <footer class="footer"><span>FAKER GROWTH SIM · FAN MADE PIXEL GAME</span><span>v4.0</span></footer>
  </div>`;
 }
 function titleScreen(){
@@ -84,14 +85,14 @@ function titleScreen(){
   <div class="title-art" style="background-image:linear-gradient(180deg,transparent 25%,rgba(8,15,34,.06) 55%,#071025 100%),url('${img('title-stage.webp')}')">
     <div class="title-kicker">PIXEL ESPORTS · CAREER SIMULATION</div>
     <h1>페이커 <span>키우기</span></h1>
-    <p class="title-subtitle">연습생에서 전설이 되기까지, 당신의 선택이 역사를 만든다.</p>
+    <p class="title-subtitle">학생에서 1군까지, 실력으로 증명하기, 당신의 선택이 역사를 만든다.</p>
   </div>
   <div class="title-actions">
     <button class="btn primary massive" data-action="new-game"><span>⚔</span> 새 게임 시작 <b>➜</b></button>
     <div class="button-pair"><button class="btn dark" data-action="continue-game" ${!game?'disabled':''}><span>▣</span> 이어하기</button><button class="btn dark" data-action="hall"><span>♛</span> 명예의 전당</button></div>
   </div>
-  ${section(`${labelHeading('✦','당신의 커리어, 당신의 선택')}<p class="soft">17세 마스터 0LP에서 시작해 3주 시즌 동안 성장하세요. 연습생 → 2군 → 1군으로 승격하며 이적 시장과 은퇴까지 도전합니다.</p>${`<div class="mini-flow"><span>학생</span><b>›</b><span>연습생</span><b>›</b><span>2군</span><b>›</b><span>1군</span><b>›</b><span>은퇴</span></div>`}`,'intro-panel')}
-  ${section(`${labelHeading('⚑','LCK 팀들','실제 구단 로고 · 가상 계약')}<div class="team-row">${TEAMS.slice(0,5).map(t=>`<div class="team-pill">${teamLogo(t.id,true)}<small>${h(t.name)}</small></div>`).join('')}</div>`,'team-showcase')}
+  ${section(`${labelHeading('✦','당신의 커리어, 당신의 선택')}<p class="soft">17세 마스터 0LP에서 시작해 3주 시즌 동안 성장하세요. 실력에 따라 연습생·2군·1군 제안을 받고, 1군 입단 후 LCK → MSI → Worlds에 도전합니다. Worlds 4년 연속 우승하면 특별 엔딩!</p>${`<div class="mini-flow"><span>학생</span><b>›</b><span>연습생</span><b>›</b><span>2군</span><b>›</b><span>1군</span><b>›</b><span>은퇴</span></div>`}`,'intro-panel')}
+  ${section(`${labelHeading('⚑','2026 LCK 최종 상위 팀','실제 구단 로고 · 가상 계약')}<div class="team-row">${LCK_2026_STANDINGS.slice(0,5).map(r=>TEAMS.find(t=>t.id===r.teamId)).map(t=>`<div class="team-pill">${teamLogo(t.id,true)}<small>${h(t.name)}</small></div>`).join('')}</div>`,'team-showcase')}
   <p class="fine-print">본 작품은 비공식 팬메이드 프로토타입이며, 실제 선수와 구단의 보증·제휴를 의미하지 않습니다. 게임 수치는 모두 가상의 시뮬레이션입니다.</p>
  </div>`;
 }
@@ -113,8 +114,9 @@ function renderMain(){
    <div class="status-strip"><div><small>나이</small><strong>${g.player.age}세</strong></div><div><small>시즌</small><strong>${seasonLabel(g)}</strong></div><div><small>진행</small><strong>${g.career.week} / ${WEEKS_PER_SEASON}주</strong></div><div><small>소속</small><strong>${team?h(team.short):stageInfo(g.player.stage).name}</strong></div></div>
    <div class="wide-banner main-banner" style="background-image:linear-gradient(90deg,rgba(6,11,29,.2),rgba(6,11,29,.06)),url('${img('arena.webp')}')"><div class="banner-bottom"><span class="chip">${stageInfo(g.player.stage).name}</span><b>${team?h(team.name):'프로의 무대를 향해'}</b></div></div>
    ${g.career.gateMessage?`<div class="notice"><span>✦</span>${h(g.career.gateMessage)}<button class="text-icon" data-action="dismiss-notice" aria-label="알림 닫기">×</button></div>`:''}
+   ${g.proCircuit?proProgress(g):''}
    <div class="profile-layout">
-      ${section(`<div class="portrait-frame"><img src="${img(positionInfo(g.player.position).asset)}" alt="${positionInfo(g.player.position).name} 선수 프로필"/></div><div class="profile-name"><span>${h(g.player.name)}</span><small>${positionInfo(g.player.position).name} · ${stageInfo(g.player.stage).name}</small></div>`,'profile-panel')}
+      ${section(`<div class="portrait-frame"><img src="${img(positionInfo(g.player.position).asset)}" alt="${h(positionInfo(g.player.position).name)} 포지션 선수 픽셀 아트"/></div><div class="profile-name"><span>${h(g.player.name)}</span><small>${positionInfo(g.player.position).name} · ${stageInfo(g.player.stage).name}</small></div>`,'profile-panel')}
       ${section(`${labelHeading('▥','기본 능력치')}<div class="stat-list">${STATS.map(s=>bar(s.name,s.icon,g.stats[s.key],s.key==='lane'?'#fa6483':'#9ab0e3')).join('')}</div><div class="power-total">종합 전투력 <strong>${scorePower(g).toFixed(1)}</strong></div>`,'stats-panel')}
    </div>
    <div class="rank-layout">
@@ -153,11 +155,39 @@ function gateScreen(){
  const target=stageInfo(gate.toStage),current=stageInfo(gate.fromStage);
  return `<div class="page-body">
    <div class="wide-banner" style="background-image:linear-gradient(180deg,transparent,#061024),url('${img('team-arena.webp')}')"><div class="banner-overlay"><span class="eyebrow">CAREER BREAKTHROUGH</span><h2>승격 테스트</h2><p>드디어 새로운 무대의 문이 열렸습니다.</p></div></div>
-   ${section(`<div class="gate-promo"><span>${current.name}</span><b>➜</b><span>${target.name}</span></div><p class="soft center">${current.name}에서 ${target.name}(으)로 올라갈 절호의 기회!<br/>티어와 능력치는 조건을 충족했습니다. 마지막 테스트에서 실력을 증명하세요.</p><div class="gate-kpis"><span>현재 티어 <b>${tierInfo(g.rank.tier).name}</b></span><span>기본 능력치 평균 <b>${averageStats(g).toFixed(1)}</b></span><span>팀워크 <b>${Math.round(g.status.teamwork)}</b></span></div>`)}
+   ${section(`<div class="gate-promo"><span>${current.name}</span><b>➜</b><span>${target.name}</span></div><p class="soft center">${current.name}에서 ${target.name}(으)로 올라갈 절호의 기회!<br/>랭크와 능력치를 기준으로 영입 제안이 도착했습니다. 테스트 통과 후 1군·2군·연습생 제안 중 직접 선택하세요.</p><div class="gate-kpis"><span>현재 티어 <b>${tierInfo(g.rank.tier).name}</b></span><span>기본 능력치 평균 <b>${averageStats(g).toFixed(1)}</b></span><span>팀워크 <b>${Math.round(g.status.teamwork)}</b></span></div>`)}
    <div class="choices"><button class="choice-card choice-featured" data-action="gate" data-choice="focus"><span class="choice-num">01</span><span class="choice-text"><b>준비한 실력으로 테스트에 도전</b><small>체력 -10 / 컨디션 -6 · 테스트 진행</small></span><span>➜</span></button>
    <button class="choice-card" data-action="gate" data-choice="teamwork" ${g.status.teamwork<20?'disabled':''}><span class="choice-num">02</span><span class="choice-text"><b>팀워크를 보여준다</b><small>${g.status.teamwork<20?'🔒 팀워크 20 이상 필요':'테스트 합격 확률 상승'}</small></span><span>➜</span></button>
-   <button class="choice-card muted" data-action="gate" data-choice="skip"><span class="choice-num">03</span><span class="choice-text"><b>이번 도전은 미룬다</b><small>현재 커리어 단계 유지 · 다음 시즌 재도전</small></span><span>➜</span></button></div>
+   <button class="choice-card muted" data-action="gate" data-choice="skip"><span class="choice-num">03</span><span class="choice-text"><b>이번 도전은 미룬다</b><small>현재 커리어 단계 유지 · 다음 주 또는 다음 시즌 재도전</small></span><span>➜</span></button></div>
  </div>`;
+}
+function teamName(id){return TEAMS.find(x=>x.id===id)?.name||({blg:'Bilibili Gaming',tes:'Top Esports',g2:'G2 Esports',kc:'Karmine Corp',tl:'Team Liquid',fly:'FlyQuest',tsw:'Team Secret Whales',dcg:'Deep Cross Gaming',fur:'FURIA',jdg:'JD Gaming',fnc:'Fnatic',c9:'Cloud9',psg:'PSG Talon',loud:'LOUD'})[id]||id||'미정';}
+function standingsTable(rows){
+ if(!rows?.length)return '<p class="soft">리그 결과를 집계하고 있습니다.</p>';
+ return `<div class="standings-scroll"><table class="standings-table"><thead><tr><th>순위</th><th>팀</th><th>승</th><th>패</th></tr></thead><tbody>${rows.map(r=>`<tr class="${r.teamId===game.career.team?'my-team':''}"><td>${r.place}</td><td>${teamLogo(r.teamId,true)} ${h(teamName(r.teamId))}</td><td>${r.wins}</td><td>${r.losses}</td></tr>`).join('')}</tbody></table></div>`;
+}
+function proProgress(g){
+ const t=g.proCircuit;
+ const steps=[['lck','LCK'],['msi','MSI'],['worlds','Worlds']];
+ const qualifying=t.phase==='msi'?`<p class="${t.qualifiedMSI?'positive-note':'warning-note'}">${t.qualifiedMSI?'✓ MSI 출전권 확보':'× Road to MSI 탈락 · 국제 대회 출전 불가'}</p>`:
+ t.phase==='worlds'?`<p class="${t.qualifiedWorlds?'positive-note':'warning-note'}">${t.qualifiedWorlds?'✓ Worlds 출전권 확보':'× LCK 플레이오프 성적 미달 · Worlds 출전 불가'}</p>`:'';
+ return section(`${labelHeading('🏆','프로 대회 커리어',`${t.year}년차 · Worlds 연속 우승 ${t.worldsStreak}/4`)}<div class="pro-phase-track">${steps.map(([id,label])=>`<span class="${id===t.phase?'active':''}">${label}</span>`).join('<b>›</b>')}</div>${qualifying}${t.phase==='lck'&&t.standings?.length?standingsTable(t.standings):''}<p class="soft">LCK 국내 10팀 시뮬레이션 · MSI/Worlds 진출 여부는 대회 성적으로 결정</p>`,'pro-panel');
+}
+function tournamentScreen(){
+ const g=game,t=g.proCircuit,r=t.currentReport;if(!r)return '<p>대회 결산 정보를 불러올 수 없습니다.</p>';
+ const champion=r.champion||r.msiChampion;
+ const intro=r.phase==='lck'?'정규 시즌 상위 6팀의 Road to MSI 결과입니다.':r.phase==='msi'?'국제 대회 결산 및 LCK 후반 플레이오프 결과입니다.':'Worlds 월드 챔피언십 최종 결과입니다.';
+ const qualification=r.phase==='lck'?`<div class="${r.qualified?'positive-note':'warning-note'}">${r.qualified?'MSI 출전 확정!':'MSI 출전 실패 · 다음 단계에서도 훈련은 계속할 수 있습니다.'}</div>`:
+ r.phase==='msi'?`<div class="${r.qualifiedWorlds?'positive-note':'warning-note'}">${r.qualifiedWorlds?'Worlds 출전 확정!':'Worlds 진출 실패 · LCK 성적이 부족합니다.'}</div>`:
+ `<div class="${r.won?'positive-note':'warning-note'}">${r.won?`🏆 Worlds 우승! ${r.streak}년 연속 우승`:'이번 해의 Worlds 도전이 끝났습니다. 다음 해에 다시 도전하세요.'}</div>`;
+ return `<div class="page-body"><div class="wide-banner" style="background-image:linear-gradient(180deg,transparent,#09142a),url('${img('team-arena.webp')}')"><div class="banner-overlay"><span class="eyebrow">PRO TOURNAMENT · YEAR ${r.year}</span><h2>${h(r.title)}</h2><p>${h(intro)}</p></div></div>
+ ${section(`${labelHeading('🏆','대회 결산')}<h2 class="tournament-title">${r.phase==='lck'?'LCK / ROAD TO MSI':r.phase==='msi'?'MID-SEASON INVITATIONAL':'WORLD CHAMPIONSHIP'}</h2>${qualification}${champion?`<p class="tour-winner">우승 팀 · <strong>${h(teamName(champion))}</strong></p>`:''}${r.phase==='lck'?`<p>MSI 대표: ${(r.qualifiers||[]).map(x=>h(teamName(x))).join(' · ')}</p>`:''}${r.phase==='msi'?`<p>LCK 우승: ${h(teamName(r.lckChampion))}</p><p>Worlds 출전권: ${(r.worldsSeeds||[]).map(x=>h(teamName(x))).join(' · ')}</p>`:''}${r.phase==='worlds'?`<p>나의 Worlds 우승 ${t.worldsWins}회 · 4년 연속 우승 목표</p>`:''}`,'pro-award')}
+ ${r.standings?.length?section(`${labelHeading('⚑',r.phase==='lck'?'LCK 10팀 최종 순위':'LCK 최종 성적 및 플레이오프')} ${standingsTable(r.standings)}`):''}
+ ${r.phase==='lck'&&r.road?.length?section(`${labelHeading('⚔','ROAD TO MSI 선발전')}<div class="tour-logs">${r.road.map(m=>`<div>${h(teamName(m.a))} ${h(m.aWins)} : ${h(m.bWins)} ${h(teamName(m.b))} · <strong>${h(teamName(m.winner))} 승</strong></div>`).join('')}</div>`):''}
+ ${r.phase==='worlds'&&r.knockout?.length?section(`${labelHeading('⚔','Worlds 8강~결승')}<div class="tour-logs">${r.knockout.map(m=>`<div>${h(teamName(m.a))} ${m.score} ${h(teamName(m.b))} · <strong>${h(teamName(m.winner))} 승</strong></div>`).join('')}</div>`):''}
+ ${r.phase==='worlds'&&r.won&&r.streak>=4?'<div class="faker-banner">👑 4년 연속 Worlds 우승! 페이커 특별 엔딩 해금</div>':''}
+ <button class="btn primary full next-button" data-action="next-tournament">${r.phase==='worlds'&&r.won&&r.streak>=4?'페이커 엔딩 보기 →':r.phase==='worlds'?'다음 해 LCK 도전 →':r.phase==='lck'?'MSI 시즌으로 →':'Worlds 시즌으로 →'}</button>
+ <p class="fine-print">2026년 출전 자격 구조를 3주 시즌으로 축약한 게임용 모의 대회입니다. 실제 리그 전 경기 일정·대진·성적과 동일하지 않습니다.</p></div>`;
 }
 function resultScreen(){
  const g=game,r=g.lastResult,t=TRAININGS.find(t=>t.id===r?.trainingId);if(!r)return `<p>결과가 없습니다.</p>`;
@@ -168,7 +198,7 @@ function resultScreen(){
    ${r.missedMatch?section(`${labelHeading('⚠','경기 불참 · 회복 중')}<p class="warning-note">${h(r.recoveryNote||'체력 또는 컨디션 부족으로 이번 주 경기를 진행하지 못했습니다.')}</p><p class="soft">이번 주 솔로랭크와 팀 경기 결과가 기록되지 않습니다.</p>`,'result-panel'):''}
    ${rank?section(`${labelHeading('⚔','솔로랭크 결과')}<div class="rank-result-score"><div><small>10게임</small><strong><span class="win">${rank.wins}승</span> <span class="lose">${rank.losses}패</span></strong></div><div><small>획득 LP</small><strong class="${rank.lpDelta>=0?'win':'lose'}">${rank.lpDelta>0?'+':''}${Math.round(rank.lpDelta)}</strong></div></div><div class="rank-transition">${rankCrest(rank.beforeTier)}<span class="rank-arrow">➜</span>${rankCrest(rank.afterTier)}</div><div class="rank-names"><span>${tierInfo(rank.beforeTier).name}</span><b>${tierInfo(rank.afterTier).name} <small>총 ${Math.round(rank.afterLp)} LP</small></b></div>${rank.promotion?'<div class="positive-note">✦ 티어 승급! 새로운 단계에 도착했습니다.</div>':''}${rank.demotion?'<div class="warning-note">티어가 하락했습니다. 다음 주 다시 도전하세요.</div>':''}`,'result-panel'):
        section(`${labelHeading('▣','개인 훈련 결과')}<p class="soft">이번 주는 솔로랭크를 진행하지 않았습니다. 쌓인 능력치는 다음 경기에서 힘이 됩니다.</p>`)}
-   ${league?section(`${labelHeading('♛','팀 리그 경기')}<div class="league-score"><div>${teamLogo(g.career.team)}<b>${h(teamInfo(g.career.team).name)}</b></div><div class="versus"><small>${stageInfo(g.player.stage).name} 리그</small><strong>${league.score}</strong><span class="${league.victory?'win':'lose'}">${league.victory?'VICTORY':'DEFEAT'}</span></div><div>${teamLogo(league.enemyId)}<b>${h(teamInfo(league.enemyId).name)}</b></div></div>${league.mvp?'<div class="positive-note">🏆 경기 MVP! 인기가 상승했습니다.</div>':''}<p class="result-log">${h(r.highlight)}</p>`,'league-panel'):
+   ${league?.pro?section(`${labelHeading('♛','LCK / 국제 대회 주간 현황')}<p class="soft">${h(league.note||`이번 주 LCK 팀 대진 ${league.played?.length||0}경기`)}</p>${league.played?.length?`<div class="tour-logs">${league.played.map(m=>`<div>${teamLogo(g.career.team,true)} ${h(teamName(g.career.team))} vs ${h(teamName(m.enemyId))} · <strong class="${m.victory?'win':'lose'}">${m.victory?'승리':'패배'} ${m.score}</strong></div>`).join('')}</div>`:''}${league.standings?.length?standingsTable(league.standings):''}` ,'league-panel'):league?section(`${labelHeading('♛','팀 리그 경기')}<div class="league-score"><div>${teamLogo(g.career.team)}<b>${h(teamInfo(g.career.team).name)}</b></div><div class="versus"><small>${stageInfo(g.player.stage).name} 리그</small><strong>${league.score}</strong><span class="${league.victory?'win':'lose'}">${league.victory?'VICTORY':'DEFEAT'}</span></div><div>${teamLogo(league.enemyId)}<b>${h(teamInfo(league.enemyId).name)}</b></div></div>${league.mvp?'<div class="positive-note">🏆 경기 MVP! 인기가 상승했습니다.</div>':''}<p class="result-log">${h(r.highlight)}</p>`,'league-panel'):
       section(`${labelHeading('♜','커리어 현황')}<p class="soft">학생 단계에서는 팀 리그 경기가 없습니다. 티어를 올리고 승격 테스트를 통과하면 프로 무대가 열립니다.</p>`)}
    <button class="btn primary full next-button" data-action="next-week">${r.week===WEEKS_PER_SEASON?'시즌 결산으로 →':'다음 주로 진행 →'}</button>
  </div>`;
@@ -176,14 +206,14 @@ function resultScreen(){
 function marketScreen(){
  const g=game,target=stageInfo(g.marketTarget);
  return `<div class="page-body">
-  <div class="wide-banner" style="background-image:linear-gradient(180deg,transparent,#09142a),url('${img('office.webp')}')"><div class="banner-overlay"><span class="eyebrow">TRANSFER MARKET</span><h2>이적 시장</h2><p>${target.name} 무대에서 새로운 계약을 체결하세요.</p></div></div>
+  <div class="wide-banner" style="background-image:linear-gradient(180deg,transparent,#09142a),url('${img('office.webp')}')"><div class="banner-overlay"><span class="eyebrow">TRANSFER MARKET</span><h2>이적 시장</h2><p>현재 랭크와 능력치에 맞는 구단 제안을 선택하세요.</p></div></div>
   ${g.career.gateMessage?`<div class="notice"><span>✦</span>${h(g.career.gateMessage)}</div>`:''}
   ${section(`${labelHeading('▥','선수 시장 정보')}<div class="market-metrics"><div><small>시장가치 지수</small><b>${Math.round(g.career.marketValue)}<em>/ 100</em></b></div><div><small>인기</small><b>${Math.round(g.status.popularity)}<em>/ 100</em></b></div><div><small>최근 경기 승률</small><b>${g.career.matchWins+g.career.matchLosses?Math.round(g.career.matchWins/(g.career.matchWins+g.career.matchLosses)*100):0}<em>%</em></b></div></div><p class="hint">표시된 연봉은 게임 밸런스를 위한 가상 금액입니다. 구단의 실제 계약 제안이 아닙니다.</p>`)}
   ${section(`${labelHeading('⚑','도착한 영입 제안',`${g.offers.length}건`)}<div class="offers">${g.offers.map((o,i)=>{
     const team=teamInfo(o.teamId);
-    return `<article class="offer ${i===0?'offer-featured':''}"><div class="offer-top">${teamLogo(o.teamId)}<div><b>${h(team.name)}</b><small>${target.name} · ${h(o.flavor)}</small></div>${i===0?'<span class="offer-tag">NEW</span>':''}</div><div class="offer-info"><div><small>계약 기간</small><b>${o.seasons}시즌</b></div><div><small>시즌당 연봉</small><b>${formatMoney(o.salary)}</b></div></div><div class="offer-buttons"><button class="btn green" data-action="accept-offer" data-id="${h(o.id)}">✓ 계약 수락</button><button class="btn outline-danger" data-action="reject-offer" data-id="${h(o.id)}">× 거절</button></div></article>`;
+    return `<article class="offer ${i===0?'offer-featured':''}"><div class="offer-top">${teamLogo(o.teamId)}<div><b>${h(team.name)}</b><small>2026 LCK ${o.place||"-"}위 · ${stageInfo(o.targetStage).name} · ${h(o.flavor)}</small></div>${i===0?'<span class="offer-tag">NEW</span>':''}</div><div class="offer-info"><div><small>계약 기간</small><b>${o.seasons}시즌</b></div><div><small>시즌당 연봉</small><b>${formatMoney(o.salary)}</b></div></div><div class="offer-buttons"><button class="btn green" data-action="accept-offer" data-id="${h(o.id)}">✓ 계약 수락</button><button class="btn outline-danger" data-action="reject-offer" data-id="${h(o.id)}">× 거절</button></div></article>`;
   }).join('')}</div>`)}
-  <p class="help-line">제안을 모두 거절하면 남은 계약이 없어 은퇴 처리됩니다. 신중하게 선택하세요.</p>
+  <p class="help-line">${g.marketMandatory|| (g.player.stage!=='student'&&g.career.contractRemaining<=0)?'모든 제안을 거절하면 계약 만료로 은퇴하게 됩니다.':'모든 제안을 거절해도 학생 또는 현재 소속팀으로 계속 진행합니다.'}</p>
  </div>`;
 }
 function endingScreen(){
@@ -192,7 +222,7 @@ function endingScreen(){
  return `<div class="page-body ending-page">
    <div class="wide-banner ending-banner" style="background-image:linear-gradient(180deg,transparent,#09142a),url('${img('retirement-stage.webp')}')"><div class="banner-overlay"><span class="eyebrow">THE LAST LEGEND</span><h2>은퇴 결산</h2><p>한 선수의 여정이 끝났습니다.</p></div></div>
    ${section(`<div class="ending-hero"><img src="${img('retirement-player.webp')}" alt="은퇴 선수 픽셀 아트"/><div><span class="eyebrow">CAREER SUMMARY</span><h3>${h(g.player.name)}</h3><p>${positionInfo(g.player.position).name} · 은퇴 나이 ${g.player.age}세</p><div class="grade ${e.grade==='GOAT'?'gold-glow':''}">${h(e.grade)}</div><div class="career-score">커리어 점수 <b>${e.score.toLocaleString('ko-KR')}</b></div></div></div><p class="ending-reason">${h(e.reason)}</p>`,'ending-info')}
-   ${section(`${labelHeading('♛','커리어 기록')}<div class="ending-stats"><div><small>최고 티어</small><strong>${rankCrest(g.rank.highest,'small')} ${tierInfo(g.rank.highest).name}</strong></div><div><small>리그 우승</small><strong>${g.career.championships}회</strong></div><div><small>팀 경기 승수</small><strong>${g.career.matchWins}승</strong></div><div><small>통산 연봉</small><strong>${formatMoney(g.career.totalSalary)}</strong></div><div><small>활동 기간</small><strong>${Math.ceil(g.career.totalTurns/(WEEKS_PER_SEASON*2))}년</strong></div><div><small>은퇴 후 진로</small><strong>${e.path}</strong></div></div>`)}
+   ${section(`${labelHeading('♛','커리어 기록')}<div class="ending-stats"><div><small>최고 티어</small><strong>${rankCrest(g.rank.highest,'small')} ${tierInfo(g.rank.highest).name}</strong></div><div><small>리그 우승</small><strong>${g.career.championships}회</strong></div><div><small>Worlds 우승</small><strong>${g.proCircuit?.worldsWins||0}회 (최대 연속 ${g.proCircuit?.worldsStreak||0}년)</strong></div><div><small>팀 경기 승수</small><strong>${g.career.matchWins}승</strong></div><div><small>통산 연봉</small><strong>${formatMoney(g.career.totalSalary)}</strong></div><div><small>활동 기간</small><strong>${Math.ceil(g.career.totalTurns/(WEEKS_PER_SEASON*3))}년</strong></div><div><small>은퇴 후 진로</small><strong>${e.path}</strong></div></div>`)}
    ${section(`${labelHeading('⚑','소속 팀 이력')}<div class="career-journey">${g.career.teamHistory.length?g.career.teamHistory.map(item=>`<div class="journey-item">${teamLogo(item.teamId,true)}<b>${h(teamInfo(item.teamId).name)}</b><small>${stageInfo(item.stage).name} · ${item.season}시즌 합류</small></div>`).join(''):'<p class="soft">끝내 소속 팀을 찾지 못한 커리어.</p>'}</div>`)}
    <div class="quote">“${h(e.oneLiner)}”</div>
    <div class="hof-done">♛ 명예의 전당 기록 완료</div>
@@ -209,7 +239,7 @@ function hallScreen(){
   <p class="fine-print">명예의 전당과 현재 게임은 이 브라우저의 localStorage에 저장됩니다. 브라우저 데이터 삭제 전 기록을 내보내세요.</p>
  </div>`;
 }
-function helpDialog(){return `<div class="dialog-backdrop" id="info-modal"><div class="dialog" role="dialog" aria-modal="true" aria-label="게임 안내"><div class="dialog-head"><h3>게임 방법</h3><button class="icon-button" data-action="close-help">×</button></div><div class="dialog-content"><p><b>목표</b> · 17세 학생으로 시작해 연습생 → 2군 → 1군을 거쳐 오랫동안 살아남으세요. 시장가치가 떨어져 다음 팀의 제안이 0건이면 은퇴합니다.</p><p><b>한 시즌</b> · 3주 / 매주 훈련 한 번 선택. 훈련 → 랜덤 이벤트 → 경기 결과로 진행합니다.</p><p><b>솔로랭크</b> · 훈련을 선택할 때마다 10게임이 처리됩니다. 승리 +40~90LP / 패배 -20~40LP. 마스터 0LP / 그랜드마스터 400LP / 챌린저 800LP 기준의 단독 게임용 간소화 규칙입니다.</p><p><b>회복</b> · 체력 30 미만이면 컨디션이 추가 감소합니다. 둘 중 하나가 0이면 경기 불참, 다음 주 강제 휴식(체력 +40 / 컨디션 +30). 체력 0은 부상도 발생합니다.</p><p><b>승격</b> · 일정 티어와 능력치를 달성하고 시즌 종료 시 승격 테스트에 합격해야 합니다.</p><p><b>저장</b> · 매 선택마다 현재 브라우저에 자동 저장됩니다. 명예의 전당에서 기록을 백업할 수 있습니다.</p><p class="soft">본 프로젝트는 기획서 기반 시연용 게임으로 실제 프로 선수의 경기 결과나 계약과 관계없습니다.</p></div><button class="btn primary full" data-action="close-help">확인</button></div></div>`;}
+function helpDialog(){return `<div class="dialog-backdrop" id="info-modal"><div class="dialog" role="dialog" aria-modal="true" aria-label="게임 안내"><div class="dialog-head"><h3>게임 방법</h3><button class="icon-button" data-action="close-help">×</button></div><div class="dialog-content"><p><b>목표</b> · 17세 학생으로 시작해 연습생·2군을 건너뛰고 1군에 직행할 수도 있으며 오랫동안 살아남으세요. 시장가치가 떨어져 다음 팀의 제안이 0건이면 은퇴합니다.</p><p><b>한 시즌</b> · 3주 / 매주 훈련 한 번 선택. 훈련 → 랜덤 이벤트 → 경기 결과로 진행합니다.</p><p><b>솔로랭크</b> · 훈련을 선택할 때마다 10게임이 처리됩니다. 승리 +18~22LP / 패배 -15~19LP. 마스터 0LP / 그랜드마스터 400LP / 챌린저 800LP 기준의 단독 게임용 간소화 규칙입니다.</p><p><b>회복</b> · 체력 30 미만이면 컨디션이 추가 감소합니다. 둘 중 하나가 0이면 경기 불참, 다음 주 강제 휴식(체력 +40 / 컨디션 +30). 체력 0은 부상도 발생합니다.</p><p><b>승격</b> · 매주 또는 시즌 결산 후 LP와 능력치를 기준으로 구단 스카우트가 옵니다. 챌린저는 2026 LCK 상위 3개 팀 1군 테스트를 받을 수 있습니다.</p><p><b>1군 대회</b> · 1년 = LCK 3주 → MSI 3주 → Worlds 3주. 국내 10팀 성적과 Road to MSI 선발전, 국제대회 출전권을 시뮬레이션합니다. Worlds를 4년 연속 우승하면 페이커 특별 엔딩이 열립니다.</p><p><b>저장</b> · 매 선택마다 현재 브라우저에 자동 저장됩니다. 명예의 전당에서 기록을 백업할 수 있습니다.</p><p class="soft">본 프로젝트는 기획서 기반 시연용 게임으로 실제 프로 선수의 경기 결과나 계약과 관계없습니다.</p></div><button class="btn primary full" data-action="close-help">확인</button></div></div>`;}
 function render(){
  const current=page==='title'?'title':page==='create'?'create':page==='hall'?'hall':game?.scene;
  let content;
@@ -220,6 +250,7 @@ function render(){
  else if(current==='event')content=eventScreen();
  else if(current==='gate')content=gateScreen();
  else if(current==='result')content=resultScreen();
+ else if(current==='tournament')content=tournamentScreen();
  else if(current==='market')content=marketScreen();
  else if(current==='ending')content=endingScreen();
  else content=titleScreen();
@@ -270,6 +301,7 @@ app.addEventListener('click',e=>{
    case 'event-choice':changeGame(g=>chooseEvent(g,EVENTS,Number(b.dataset.index)));break;
    case 'gate':changeGame(g=>chooseGate(g,b.dataset.choice));break;
    case 'next-week':changeGame(g=>continueFromResult(g));break;
+   case 'next-tournament':changeGame(g=>continueFromTournament(g));break;
    case 'accept-offer':changeGame(g=>acceptOffer(g,b.dataset.id));break;
    case 'reject-offer':if(window.confirm('이 제안을 거절할까요? 남은 제안이 없다면 은퇴합니다.'))changeGame(g=>rejectOffer(g,b.dataset.id));break;
    case 'dismiss-notice':game.career.gateMessage='';save();render();break;

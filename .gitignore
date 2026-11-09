@@ -5,3 +5,5 @@ dist
 .DS_Store
 
 *.before-random.bak
+
+*.before-scout.bak
