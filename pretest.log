@@ -1,0 +1,428 @@
+TAP version 13
+# Subtest: 마스터부터 시작하고 티어는 최상위 3종, 한 시즌 3주
+not ok 1 - 마스터부터 시작하고 티어는 최상위 3종, 한 시즌 3주
+  ---
+  duration_ms: 1.60307
+  type: 'test'
+  location: '/mnt/data/faker-worlds-v4/tests/engine.test.js:14:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    
+    3 !== 2
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 2
+  actual: 3
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///mnt/data/faker-worlds-v4/tests/engine.test.js:15:9)
+    Test.runInAsyncScope (node:async_hooks:214:14)
+    Test.run (node:internal/test_runner/test:1047:25)
+    Test.start (node:internal/test_runner/test:944:17)
+    startSubtestAfterBootstrap (node:internal/test_runner/harness:296:17)
+  ...
+# Subtest: 초기 미드 스탯과 마스터 0LP
+ok 2 - 초기 미드 스탯과 마스터 0LP
+  ---
+  duration_ms: 0.567046
+  type: 'test'
+  ...
+# Subtest: 마스터 LP 표시: 0~400, 그랜드마스터 400~800, 챌린저 이후
+ok 3 - 마스터 LP 표시: 0~400, 그랜드마스터 400~800, 챌린저 이후
+  ---
+  duration_ms: 0.782862
+  type: 'test'
+  ...
+# Subtest: 승률 공식 컨디션과 최솟값 15%, 최댓값 85%
+ok 4 - 승률 공식 컨디션과 최솟값 15%, 최댓값 85%
+  ---
+  duration_ms: 0.858707
+  type: 'test'
+  ...
+# Subtest: 솔로랭크 10판, 초기 180LP + 다음 주로 진행
+ok 5 - 솔로랭크 10판, 초기 180LP + 다음 주로 진행
+  ---
+  duration_ms: 1.472774
+  type: 'test'
+  ...
+# Subtest: LP 400/800 기준 승급 및 강등, 마스터 최저 0
+ok 6 - LP 400/800 기준 승급 및 강등, 마스터 최저 0
+  ---
+  duration_ms: 1.602169
+  type: 'test'
+  ...
+# Subtest: 영상 분석, 휴식, 팀 훈련 학생 잠금
+ok 7 - 영상 분석, 휴식, 팀 훈련 학생 잠금
+  ---
+  duration_ms: 0.521517
+  type: 'test'
+  ...
+# Subtest: 이벤트 선택 조건 잠금과 적용
+ok 8 - 이벤트 선택 조건 잠금과 적용
+  ---
+  duration_ms: 0.907009
+  type: 'test'
+  ...
+# Subtest: 체력 0: 즉시 경기 불참 + 다음 주 강제 회복 + 부상
+ok 9 - 체력 0: 즉시 경기 불참 + 다음 주 강제 회복 + 부상
+  ---
+  duration_ms: 0.749421
+  type: 'test'
+  ...
+# Subtest: 컨디션 0: 번아웃으로 경기 불참하고 다음 턴 휴식만
+ok 10 - 컨디션 0: 번아웃으로 경기 불참하고 다음 턴 휴식만
+  ---
+  duration_ms: 0.559064
+  type: 'test'
+  ...
+# Subtest: 이벤트 결과가 체력 0으로 떨어져도 강제 휴식 처리
+not ok 11 - 이벤트 결과가 체력 0으로 떨어져도 강제 휴식 처리
+  ---
+  duration_ms: 2.277809
+  type: 'test'
+  location: '/mnt/data/faker-worlds-v4/tests/engine.test.js:103:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    + actual - expected
+    
+    + {
+    +   phase: 'lck',
+    +   place: 10,
+    +   played: [
+    +     {
+    +       a: 't1',
+    +       aWins: 0,
+    +       b: 'bro',
+    +       bWins: 2,
+    +       enemyId: 'bro',
+    +       loser: 't1',
+    +       score: '0:2',
+    +       victory: false,
+    +       winner: 'bro'
+    +     },
+    +     {
+    +       a: 't1',
+    +       aWins: 0,
+    +       b: 'bnk',
+    +       bWins: 2,
+    +       enemyId: 'bnk',
+    +       loser: 't1',
+    +       score: '0:2',
+    +       victory: false,
+    +       winner: 'bnk'
+    +     },
+    +     {
+    +       a: 't1',
+    +       aWins: 0,
+    +       b: 'dk',
+    +       bWins: 2,
+    +       enemyId: 'dk',
+    +       loser: 't1',
+    +       score: '0:2',
+    +       victory: false,
+    +       winner: 'dk'
+    +     }
+    +   ],
+    +   standings: [
+    +     {
+    +       games: 3,
+    +       losses: 0,
+    +       place: 1,
+    +       teamId: 'bnk',
+    +       wins: 3
+    +     },
+    +     {
+    +       games: 3,
+    +       losses: 0,
+    +       place: 2,
+    +       teamId: 'ns',
+    +       wins: 3
+    +     },
+    +     {
+    +       games: 3,
+    +       losses: 0,
+    +       place: 3,
+    +       teamId: 'bro',
+    +       wins: 3
+    +     },
+    +     {
+    +       games: 3,
+    +       losses: 1,
+    +       place: 4,
+    +       teamId: 'kt',
+    +       wins: 2
+    +     },
+    +     {
+    +       games: 3,
+    +       losses: 1,
+    +       place: 5,
+    +       teamId: 'drx',
+    +       wins: 2
+    +     },
+    +     {
+    +       games: 3,
+    +       losses: 2,
+    +       place: 6,
+    +       teamId: 'dk',
+    +       wins: 1
+    +     },
+    +     {
+    +       games: 3,
+    +       losses: 2,
+    +       place: 7,
+    +       teamId: 'dn',
+    +       wins: 1
+    +     },
+    +     {
+    +       games: 3,
+    +       losses: 3,
+    +       place: 8,
+    +       teamId: 'geng',
+    +       wins: 0
+    +     },
+    +     {
+    +       games: 3,
+    +       losses: 3,
+    +       place: 9,
+    +       teamId: 'hle',
+    +       wins: 0
+    +     },
+    +     {
+    +       games: 3,
+    +       losses: 3,
+    +       place: 10,
+    +       teamId: 't1',
+    +       wins: 0
+    +     }
+    +   ]
+    + }
+    - null
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: ~
+  actual:
+    phase: 'lck'
+    played:
+      0:
+        a: 't1'
+        b: 'bro'
+        aWins: 0
+        bWins: 2
+        winner: 'bro'
+        loser: 't1'
+        score: '0:2'
+        victory: false
+        enemyId: 'bro'
+      1:
+        a: 't1'
+        b: 'bnk'
+        aWins: 0
+        bWins: 2
+        winner: 'bnk'
+        loser: 't1'
+        score: '0:2'
+        victory: false
+        enemyId: 'bnk'
+      2:
+        a: 't1'
+        b: 'dk'
+        aWins: 0
+        bWins: 2
+        winner: 'dk'
+        loser: 't1'
+        score: '0:2'
+        victory: false
+        enemyId: 'dk'
+    standings:
+      0:
+        teamId: 'bnk'
+        wins: 3
+        losses: 0
+        games: 3
+        place: 1
+      1:
+        teamId: 'ns'
+        wins: 3
+        losses: 0
+        games: 3
+        place: 2
+      2:
+        teamId: 'bro'
+        wins: 3
+        losses: 0
+        games: 3
+        place: 3
+      3:
+        teamId: 'kt'
+        wins: 2
+        losses: 1
+        games: 3
+        place: 4
+      4:
+        teamId: 'drx'
+        wins: 2
+        losses: 1
+        games: 3
+        place: 5
+      5:
+        teamId: 'dk'
+        wins: 1
+        losses: 2
+        games: 3
+        place: 6
+      6:
+        teamId: 'dn'
+        wins: 1
+        losses: 2
+        games: 3
+        place: 7
+      7:
+        teamId: 'geng'
+        wins: 0
+        losses: 3
+        games: 3
+        place: 8
+      8:
+        teamId: 'hle'
+        wins: 0
+        losses: 3
+        games: 3
+        place: 9
+      9:
+        teamId: 't1'
+        wins: 0
+        losses: 3
+        games: 3
+        place: 10
+    place: 10
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///mnt/data/faker-worlds-v4/tests/engine.test.js:109:46)
+    Test.runInAsyncScope (node:async_hooks:214:14)
+    Test.run (node:internal/test_runner/test:1047:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:744:18)
+    Test.postRun (node:internal/test_runner/test:1173:19)
+    Test.run (node:internal/test_runner/test:1101:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: 3주차 시즌 종료 후 승격 테스트 및 계약 제안
+ok 12 - 3주차 시즌 종료 후 승격 테스트 및 계약 제안
+  ---
+  duration_ms: 1.502588
+  type: 'test'
+  ...
+# Subtest: 계약 만료 후 제안이 없으면 은퇴
+not ok 13 - 계약 만료 후 제안이 없으면 은퇴
+  ---
+  duration_ms: 0.742381
+  type: 'test'
+  location: '/mnt/data/faker-worlds-v4/tests/engine.test.js:120:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    + actual - expected
+    
+    + 'tournament'
+    - 'ending'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 'ending'
+  actual: 'tournament'
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///mnt/data/faker-worlds-v4/tests/engine.test.js:125:9)
+    Test.runInAsyncScope (node:async_hooks:214:14)
+    Test.run (node:internal/test_runner/test:1047:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:744:18)
+    Test.postRun (node:internal/test_runner/test:1173:19)
+    Test.run (node:internal/test_runner/test:1101:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: 이적 제안 거절 시 은퇴 처리
+ok 14 - 이적 제안 거절 시 은퇴 처리
+  ---
+  duration_ms: 0.262857
+  type: 'test'
+  ...
+# Subtest: 1.0 저장 데이터 및 명예의 전당 기록 이전
+not ok 15 - 1.0 저장 데이터 및 명예의 전당 기록 이전
+  ---
+  duration_ms: 0.284219
+  type: 'test'
+  location: '/mnt/data/faker-worlds-v4/tests/engine.test.js:133:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    
+    3 !== 2
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 2
+  actual: 3
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///mnt/data/faker-worlds-v4/tests/engine.test.js:136:9)
+    Test.runInAsyncScope (node:async_hooks:214:14)
+    Test.run (node:internal/test_runner/test:1047:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:744:18)
+    Test.postRun (node:internal/test_runner/test:1173:19)
+    Test.run (node:internal/test_runner/test:1101:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: 시장가치 계산과 커리어 점수
+ok 16 - 시장가치 계산과 커리어 점수
+  ---
+  duration_ms: 0.224158
+  type: 'test'
+  ...
+# Subtest: 랜덤 성장 결과가 자동으로 기록됨
+ok 17 - 랜덤 성장 결과가 자동으로 기록됨
+  ---
+  duration_ms: 0.38442
+  type: 'test'
+  ...
+# Subtest: LCK 2026 최종 순위 상위권은 GEN, HLE, T1
+ok 18 - LCK 2026 최종 순위 상위권은 GEN, HLE, T1
+  ---
+  duration_ms: 1.206
+  type: 'test'
+  ...
+# Subtest: 학생 챌린저 800LP라면 세 팀이 1군으로 직접 영입 제안
+ok 19 - 학생 챌린저 800LP라면 세 팀이 1군으로 직접 영입 제안
+  ---
+  duration_ms: 2.910229
+  type: 'test'
+  ...
+# Subtest: 마스터 0LP 제안 없음, 그랜드마스터는 2군 중심
+ok 20 - 마스터 0LP 제안 없음, 그랜드마스터는 2군 중심
+  ---
+  duration_ms: 0.211099
+  type: 'test'
+  ...
+# Subtest: 학생은 영입 제안을 모두 거절해도 은퇴하지 않음
+ok 21 - 학생은 영입 제안을 모두 거절해도 은퇴하지 않음
+  ---
+  duration_ms: 0.582149
+  type: 'test'
+  ...
+# Subtest: 3주차 결산에서도 영입 테스트가 시작됨
+ok 22 - 3주차 결산에서도 영입 테스트가 시작됨
+  ---
+  duration_ms: 0.600076
+  type: 'test'
+  ...
+1..22
+# tests 22
+# suites 0
+# pass 18
+# fail 4
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 80.421958

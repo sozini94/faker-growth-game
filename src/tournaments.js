@@ -107,47 +107,77 @@ function tournamentDoubleElim(ids,g,rng,power){
  const champion=active[0]?.id||ids[0];
  return {champion,runnerUp:games.at(-1)?.loser||null,matches:games};
 }
+/** 상위 6팀 BO5 플레이오프. 매 경기의 패자가 실제로 탈락하는 순서로 1~6위를 확정합니다.
+ * 정규시즌 상위 두 팀은 2라운드 직행, 하위 네 팀은 1라운드부터 진행합니다.
+ * 게임용 압축 대진이며 2026년 실제 플레이인/레전드·라이즈 편성은 생략합니다.
+ */
+export function simulateLckPlayoffs(rows,g,rng,power){
+ const ids=rows.slice(0,6).map(r=>r.teamId);
+ if(ids.length!==6)throw Error('LCK 플레이오프는 6팀이 필요합니다.');
+ const log=[];
+ const play=(stage,a,b)=>{const m=series(a,b,g,power,rng,5);log.push({...m,stage});return m;};
+ const r1a=play('1라운드 · 3위 vs 6위',ids[2],ids[5]);
+ const r1b=play('1라운드 · 4위 vs 5위',ids[3],ids[4]);
+ const r2a=play('승자조 2라운드 A',ids[0],r1b.winner);
+ const r2b=play('승자조 2라운드 B',ids[1],r1a.winner);
+ const lower1=play('패자조 1라운드',r1a.loser,r1b.loser);
+ const lower2=play('패자조 2라운드',lower1.winner,r2a.loser);
+ const lower3=play('패자조 3라운드',lower2.winner,r2b.loser);
+ const upperFinal=play('승자조 결승',r2a.winner,r2b.winner);
+ const lowerFinal=play('최종 결승 진출전',lower3.winner,upperFinal.loser);
+ const grandFinal=play('LCK 결승',upperFinal.winner,lowerFinal.winner);
+ const placement=[grandFinal.winner,grandFinal.loser,lowerFinal.loser,lower3.loser,lower2.loser,lower1.loser];
+ if(new Set(placement).size!==6)throw Error('플레이오프 순위 계산 실패');
+ return {champion:placement[0],runnerUp:placement[1],third:placement[2],fourth:placement[3],
+   placement,bracket:log,playoffTeams:ids};
+}
 function simulateSummerAndPlayoffs(t,g,rng,power){
- // 2026 실제 3~4R의 레전드/라이즈 상위/하위 5팀 그룹을 반영한 압축 모델
  const groups=[t.standings.slice(0,5).map(x=>x.teamId),t.standings.slice(5).map(x=>x.teamId)];
  const extras=[];
- for(const ids of groups){
-  for(let repeat=0;repeat<2;repeat++)for(const [i,a] of ids.entries())for(const b of ids.slice(i+1))extras.push(series(a,b,g,power,rng,3));
- }
+ for(const ids of groups)for(let repeat=0;repeat<2;repeat++)for(const [i,a] of ids.entries())for(const b of ids.slice(i+1))extras.push(series(a,b,g,power,rng,3));
  const ranked=standings([...t.matches,...extras],order);
- const playoffs=ranked.slice(0,6).map(x=>x.teamId);
- // 플레이오프 상위 여섯 팀의 BO5 2패 탈락 결과에서 1~3위 결정
- const bracket=tournamentDoubleElim(playoffs,g,rng,power);
- const eliminated=[];
- for(const m of bracket.matches){const candidate=m.loser;if(!eliminated.includes(candidate))eliminated.push(candidate);}
- const finalists=[bracket.champion,bracket.runnerUp,...[...eliminated].reverse()].filter((id,i,a)=>a.indexOf(id)===i);
- const seeding=finalists.concat(playoffs.filter(id=>!finalists.includes(id)));
- return {ranked,playoffTeams:playoffs,seeds:seeding.slice(0,4),bracket};
+ const playoffs=simulateLckPlayoffs(ranked,g,rng,power);
+ return {ranked,playoffTeams:playoffs.playoffTeams,seeds:playoffs.placement.slice(0,4),bracket:playoffs};
+}
+function simulateMsi2026(t,g,rng,power){
+ const field=msiField(t); // 2 LCK + 2 each LPL/LEC/LCS/LCP + 1 CBLOL = 11
+ const direct=[...t.msiSeeds,'blg','g2','tl','tsw','tes'];
+ const playIn=field.filter(id=>!direct.includes(id));
+ if(new Set(field).size!==11||direct.length!==7||playIn.length!==4)throw Error('MSI 참가팀 구성 오류');
+ const log=[];
+ const match=(stage,a,b)=>{const m=series(a,b,g,power,rng,5);log.push({...m,stage});return m;};
+ const a=match('플레이인 승자조 1',playIn[0],playIn[1]);
+ const b=match('플레이인 승자조 2',playIn[2],playIn[3]);
+ const upper=match('플레이인 승자조 결승',a.winner,b.winner);
+ const lower=match('플레이인 패자조 1',a.loser,b.loser);
+ const lowerFinal=match('플레이인 최종전',lower.winner,upper.loser);
+ const piFinal=match('플레이인 진출 결정전',upper.winner,lowerFinal.winner);
+ const bracketField=[...direct,piFinal.winner];
+ const bracket=tournamentDoubleElim(bracketField,g,rng,power);
+ return {champion:bracket.champion,runnerUp:bracket.runnerUp,field,playIn:log,
+   bracket:bracket.matches.map((m,i)=>({...m,stage:`본선 BO5 ${i+1}`})),bracketField,playInWinner:piFinal.winner};
 }
 const unique=x=>[...new Set(x)];
-function buildWorldsField(t){
- // 2026 Worlds 배정: LCK/LPL/LEC/LCS/LCP 각 3 + CBLOL 2 + MSI 우승팀 1 + MSI 준우승 지역 1.
+export function buildWorldsField(t){
+ // 기본 17팀(5개 지역 각 3팀 + CBLOL 2팀), MSI 성적에 따른 추가 2팀.
  const baseForeign=['blg','tes','jdg','g2','kc','fnc','tl','fly','c9','tsw','dcg','psg','fur','loud'];
  const field=unique([...t.worldsSeeds.slice(0,3),...baseForeign]);
  const regionOf=id=>order.includes(id)?'LCK':FOREIGN_TEAMS.find(x=>x.id===id)?.region;
- const nextForRegion=(region)=>{
-  if(region==='LCK')return (t.playoffs||[]).find(id=>!field.includes(id))||order.find(id=>!field.includes(id));
+ const nextForRegion=region=>{
+  if(region==='LCK')return t.worldsSeeds.find(id=>!field.includes(id));
   return FOREIGN_TEAMS.find(x=>x.region===region&&!field.includes(x.id))?.id;
  };
- const champion=t.msiChampion;
- if(champion){
-  // 우승팀이 이미 자국 기본 시드에 있다면 해당 지역에 추가 출전권을 부여.
-  const bonus=field.includes(champion)?nextForRegion(regionOf(champion)):champion;
+ // 우승팀 지역과 차순위 지역에 각 1장을 배정합니다.
+ // MSI 결승 양 팀이 같은 지역이면 게임용 차순위 지역 대용으로 LPL을 선택합니다.
+ const winnerRegion=regionOf(t.msiChampion);
+ let secondRegion=regionOf(t.msiFinalist);
+ if(secondRegion===winnerRegion)secondRegion=winnerRegion==='LPL'?'LCK':'LPL';
+ for(const region of [winnerRegion,secondRegion]){
+  const bonus=nextForRegion(region);
   if(bonus&&!field.includes(bonus))field.push(bonus);
  }
- if(t.msiFinalist){
-  const bonus=nextForRegion(regionOf(t.msiFinalist));
-  if(bonus&&!field.includes(bonus))field.push(bonus);
- }
- while(field.length<19){
-   const extra=[...order,...FOREIGN_TEAMS.map(x=>x.id)].find(id=>!field.includes(id));
-   if(!extra)break;field.push(extra);
- }
+ // 상위 지역 시드 데이터 미설정 시에만 19팀 맞춤 (에셋 데이터의 게임용 예외 처리).
+ while(field.length<19){const id=[...t.worldsSeeds,...FOREIGN_TEAMS.map(x=>x.id)].find(x=>!field.includes(x));if(!id)break;field.push(id);}
  return field.slice(0,19);
 }
 
@@ -180,26 +210,27 @@ export function finishProPhase(g,rng,power){
   t.msiSeeds=road.seeds;t.qualifiedMSI=t.msiSeeds.includes(g.career.team);
   report={...report,standings:t.standings,road:road.matches,qualifiers:t.msiSeeds,qualified:t.qualifiedMSI,details:[`Road to MSI: ${t.msiSeeds.join(' / ')}`]};
  }else if(t.phase==='msi'){
-  const result=tournamentDoubleElim(msiField(t),g,rng,power);
+  const result=simulateMsi2026(t,g,rng,power);
   t.msiChampion=result.champion;t.msiFinalist=result.runnerUp;
   if(result.champion===g.career.team){t.msiTitles++;report.won=true;}
   const domestic=simulateSummerAndPlayoffs(t,g,rng,power);
   t.playoffs=domestic.seeds;t.finalStandings=domestic.ranked;
-  // Worlds LCK 기본 3팀. MSI 우승팀 자동출전은 자국 플레이오프 진출 시에만 유지.
+  // LCK 플레이오프 1~3위 기본 시드. MSI 우승 LCK 팀이 PO 진출 시 최저 4번 시드.
+  // MSI 준우승 지역이 LCK인 경우에도 지역 보너스 1장. 양쪽 모두 LCK라도 4장으로 제한.
   let seeds=domestic.seeds.slice(0,3);
-  // LCK 기본 3장 + MSI 우승팀의 플레이오프 자격 + 준우승 지역 추가 시드.
-  const msiLckWinner=t.msiChampion&&order.includes(t.msiChampion)?t.msiChampion:null;
-  const additional=()=>domestic.seeds.find(x=>!seeds.includes(x));
-  if(msiLckWinner&&domestic.playoffTeams.includes(msiLckWinner)){
-   const id=seeds.includes(msiLckWinner)?additional():msiLckWinner;
-   if(id)seeds=unique([...seeds,id]);
-  }
-  if(t.msiFinalist&&order.includes(t.msiFinalist)){
-   const id=additional();if(id)seeds=unique([...seeds,id]);
+  const msiWinnerInLck=t.msiChampion&&order.includes(t.msiChampion)&&domestic.playoffTeams.includes(t.msiChampion);
+  const lckBonus=msiWinnerInLck||(t.msiFinalist&&order.includes(t.msiFinalist));
+  if(lckBonus){
+   const fourth=msiWinnerInLck&&!seeds.includes(t.msiChampion)?t.msiChampion:domestic.seeds[3];
+   if(fourth&&!seeds.includes(fourth))seeds.push(fourth);
   }
   t.worldsSeeds=seeds.slice(0,5);t.qualifiedWorlds=t.worldsSeeds.includes(g.career.team);
   report={...report,qualified:t.qualifiedMSI,won:report.won,msiChampion:result.champion,msiRunner:result.runnerUp,
-   bracket:result.matches,standings:domestic.ranked,lckChampion:domestic.bracket.champion,worldsSeeds:t.worldsSeeds,qualifiedWorlds:t.qualifiedWorlds,
+   bracket:result.bracket,msiPlayIn:result.playIn,msiBracket:result.bracket,msiField:result.field,
+   msiPlayInWinner:result.playInWinner,msiDirect:result.bracketField.filter(x=>x!==result.playInWinner),
+   standings:domestic.ranked,lckChampion:domestic.bracket.champion,
+   lckPlayoffs:domestic.bracket.bracket,lckPlacement:domestic.bracket.placement,
+   worldsSeeds:t.worldsSeeds,qualifiedWorlds:t.qualifiedWorlds,
    details:[`MSI 우승: ${result.champion}`,`LCK 플레이오프: ${domestic.seeds.slice(0,3).join(' / ')}`,`Worlds 출전권: ${t.worldsSeeds.join(' / ')}`]};
  }else{
   const result=simulateWorlds(t,g,rng,power);
