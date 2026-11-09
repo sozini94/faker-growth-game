@@ -71,3 +71,8 @@
 .title-actions button,.action-bar button{position:relative;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
 #new-game-modal{z-index:40}
 #new-game-modal .dialog{max-width:420px}
+
+/* Mobile new-game touchend fallback v2 */
+.title-actions{z-index:10}
+.title-actions [data-action="new-game"]{position:relative;z-index:11;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+#new-game-modal{z-index:80}

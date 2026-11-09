@@ -361,5 +361,19 @@ app.addEventListener('click',e=>{
    case 'close-help':document.querySelector('#info-modal')?.remove();break;
  }
 });
+// Mobile new-game touchend fallback v2
+let mobileNewGameTouch=null;
+document.addEventListener('touchstart',e=>{
+ const b=e.target.closest?.('[data-action="new-game"]');
+ mobileNewGameTouch=b&&e.touches.length===1?{x:e.touches[0].clientX,y:e.touches[0].clientY}:null;
+},{capture:true,passive:true});
+document.addEventListener('touchend',e=>{
+ const b=e.target.closest?.('[data-action="new-game"]');
+ if(!b||!mobileNewGameTouch||e.changedTouches.length!==1)return;
+ const t=e.changedTouches[0];const tap=Math.hypot(t.clientX-mobileNewGameTouch.x,t.clientY-mobileNewGameTouch.y)<18;
+ mobileNewGameTouch=null;if(!tap)return;
+ e.preventDefault();e.stopPropagation();
+ try{confirmNew();}catch(error){console.error('Mobile new game error',error);showToast('새 게임 오류: '+(error?.message||'알 수 없는 오류'));}
+},{capture:true,passive:false});
 document.addEventListener('keydown',e=>{if(e.key==='Escape')document.querySelector('#info-modal')?.remove();});
 render();
