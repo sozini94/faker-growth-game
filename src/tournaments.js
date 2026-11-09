@@ -1,4 +1,4 @@
-/** 2026 LCK/MSI/Worlds 자격 구조를 3주 게임 턴으로 압축한 독립 시뮬레이션.
+/** 2026 LCK/MSI/Worlds 자격 구조를 1주/대회 턴으로 압축한 독립 시뮬레이션.
  * 실제 경기 일정, 완전한 더블엘리미네이션 대진표는 재현하지 않습니다.
  * 공식 규칙 참고: https://lolesports.com/en-US/news/msi-and-worlds-updates
  * https://static.wikia.nocookie.net/lolesports_gamepedia_en/images/0/02/LCK_2026_Rulebook%282%29.pdf/revision/latest?cb=20260109135740
@@ -93,7 +93,10 @@ export function runProWeek(g,rng,power,skip=false){
  if(t.phase!=='lck')return {phase:t.phase,played:[],note:t.phase==='msi'?(t.qualifiedMSI?'MSI 본선 진출 준비 중':'MSI 진출 실패 · 국내 훈련 중'):(t.qualifiedWorlds?'Worlds 본선 진출 준비 중':'Worlds 진출 실패 · 국내 훈련 중')};
  if(!t.rounds.length)t.rounds=rounds(order);
  const played=[];
- for(const pairings of t.rounds.slice((week-1)*3,week*3)){
+ // LCK 정규시즌 45경기를 1주에 시뮬레이션합니다.
+ // 이전 버전 저장 데이터에 이미 치른 경기가 있으면 남은 라운드만 처리합니다.
+ const completedRounds=Math.floor(t.matches.length/5);
+ for(const pairings of t.rounds.slice(completedRounds)){
   for(const [a,b] of pairings){
    // 선수 결장은 해당 팀 승률에 페널티. 리그 전체 일정은 계속 진행.
    const basePower=skip&&g.career.team===a||skip&&g.career.team===b?Math.min(power,10):power;
@@ -268,7 +271,7 @@ export function finishProPhase(g,rng,power){
   t.worldsStreak=won?t.worldsStreak+1:0;
   report={...report,qualified:t.qualifiedWorlds,won,champion:result.champion,finalist:result.finalist,
     swiss:result.swiss,knockout:result.knockout,participants:result.field,
-    streak:t.worldsStreak,details:[`월드 챔피언: ${result.champion}`,won?`연속 우승 ${t.worldsStreak}년`:'올해 Worlds 연속 우승 기록 종료']};
+    streak:t.worldsStreak,totalWins:t.worldsWins,details:[`월드 챔피언: ${result.champion}`,`Worlds 통산 우승 ${t.worldsWins}회 / 6회`,won?`올해 Worlds 우승!`:'다음 대회에서 다시 도전']};
  }
  t.currentReport=report;
  t.history.push({year:t.year,phase:t.phase,qualified:report.qualified,won:report.won,champion:report.champion||report.msiChampion||null,

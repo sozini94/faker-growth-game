@@ -1,17 +1,24 @@
 import {initProCircuit,ensureProCircuit,runProWeek,finishProPhase,advanceProPhase,PRO_PHASES,PHASE_NAMES} from './tournaments.js';
 /** 게임 규칙/상태 변경만 담당하는 모듈. DOM과 localStorage에 의존하지 않습니다. */
-export const VERSION = 3;
+export const VERSION = 4;
 export const WEEKS_PER_SEASON = 3;
-export const RANK_THRESHOLDS = [0,400,800];
+// 1군 이후에는 LCK / MSI / Worlds가 각각 1주씩 진행됩니다.
+export const PRO_WEEKS_PER_PHASE = 1;
+export const weeksInCurrentPhase = g => g.player.stage === 'pro' ? PRO_WEEKS_PER_PHASE : WEEKS_PER_SEASON;
+// 다이아 0~99LP, 마스터 100~499LP, 그랜드마스터 500~899LP, 챌린저 900LP 이상.
+// 실제 LoL의 디비전/최상위 랭킹 규칙을 축약한 싱글플레이용 수치입니다.
+export const RANK_THRESHOLDS = [0,100,500,900];
 export const TIERS = [
-  {id:'master',name:'마스터',color:'#b58aff',symbol:'✦',minLp:0,
+  {id:'diamond',name:'다이아몬드',color:'#72b9ff',symbol:'◆',minLp:0,
+    logo:'https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-static-assets/global/default/images/ranked-emblem/emblem-diamond.png'},
+  {id:'master',name:'마스터',color:'#b58aff',symbol:'✦',minLp:100,
     logo:'https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-static-assets/global/default/images/ranked-emblem/emblem-master.png'},
-  {id:'grandmaster',name:'그랜드마스터',color:'#f77778',symbol:'✹',minLp:400,
+  {id:'grandmaster',name:'그랜드마스터',color:'#f77778',symbol:'✹',minLp:500,
     logo:'https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-static-assets/global/default/images/ranked-emblem/emblem-grandmaster.png'},
-  {id:'challenger',name:'챌린저',color:'#76ceff',symbol:'♛',minLp:800,
+  {id:'challenger',name:'챌린저',color:'#76ceff',symbol:'♛',minLp:900,
     logo:'https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-static-assets/global/default/images/ranked-emblem/emblem-challenger.png'},
 ];
-export const rankTierFromLp = lp => lp>=800?2:lp>=400?1:0;
+export const rankTierFromLp = lp => lp>=900?3:lp>=500?2:lp>=100?1:0;
 export function rankProgress(lp) {
   const tier=rankTierFromLp(lp),low=RANK_THRESHOLDS[tier];
   const high=tier===TIERS.length-1?null:RANK_THRESHOLDS[tier+1];
@@ -71,14 +78,14 @@ export function scoutingOffers(g,rng=Math.random,{renewal=false}={}) {
       teamId,targetStage:stage,place:teamPlace,seasons:roll(rng,1,3),salary,
       flavor:stage==='pro'?'1군 주전 경쟁 기회를 제안합니다.':stage==='academy'?'2군 핵심 전력으로 성장할 선수를 찾습니다.':'연습생 육성 프로젝트에 합류해 주세요.'});
   };
-  // 챌린저 800LP에 도달하면 상위 세 팀에서 1군 입단 테스트 제안이 확정됩니다.
-  if(lp>=800){['geng','hle','t1'].forEach(id=>add(id,'pro'));}
+  // 챌린저 900LP에 도달하면 상위 세 팀에서 1군 입단 테스트 제안이 확정됩니다.
+  if(lp>=900){['geng','hle','t1'].forEach(id=>add(id,'pro'));}
   // 상위권 그랜드마스터는 중상위 팀에서 1군, 그 밖에는 2군 제안.
-  if(lp>=650 && power>=23){['dk','kt'].forEach(id=>add(id,'pro'));}
-  if(lp>=400){['bnk','ns','bro'].forEach(id=>add(id,'academy'));}
-  if(lp>=250 && power>=18){['drx','dn'].forEach(id=>add(id,'academy'));}
-  // 마스터 구간에서는 연습생이 기본이지만, 능력치가 높으면 2군까지 도전합니다.
-  if(lp>=100 || power>=18){['drx','dn','bro'].forEach(id=>add(id,'trainee'));}
+  if(lp>=750 && power>=23){['dk','kt'].forEach(id=>add(id,'pro'));}
+  if(lp>=500){['bnk','ns','bro'].forEach(id=>add(id,'academy'));}
+  if(lp>=350 && power>=18){['drx','dn'].forEach(id=>add(id,'academy'));}
+  // 마스터 이상에서는 연습생이 기본이지만, 능력치가 높으면 2군까지 도전합니다.
+  if(lp>=200 || power>=18){['drx','dn','bro'].forEach(id=>add(id,'trainee'));}
   if(renewal){
     // 1군 계약 만료 시 기존 성적/시장가치까지 반영합니다.
     if(v>=25){['dk','kt','bnk','ns','bro','drx','dn'].forEach(id=>add(id,'pro'));}
@@ -98,10 +105,10 @@ function openScouting(g,rng,{renewal=false}={}){
 }
 
 export const STAGES = [
-  {id:'student',name:'학생',next:'trainee',gateTier:0,gatePower:15},
-  {id:'trainee',name:'연습생',next:'academy',gateTier:0,gatePower:22},
-  {id:'academy',name:'2군',next:'pro',gateTier:1,gatePower:29},
-  {id:'pro',name:'1군',next:null,gateTier:2,gatePower:100},
+  {id:'student',name:'학생',next:'trainee',gateTier:1,gatePower:15},
+  {id:'trainee',name:'연습생',next:'academy',gateTier:1,gatePower:22},
+  {id:'academy',name:'2군',next:'pro',gateTier:2,gatePower:29},
+  {id:'pro',name:'1군',next:null,gateTier:3,gatePower:100},
 ];
 export const TRAININGS = [
   {id:'solo',name:'솔로랭크',icon:'⚔',desc:'라인전 +3~6 · 한타 +2~4 · 랭크 10판',className:'red',effects:{lane:2,fight:1,stamina:-15,condition:-5}},
@@ -207,7 +214,7 @@ export function meetsRequirements(g,requires={}) {
   });
 }
 function updateRank(g,amount) {
-  // 마스터 이상은 누적 LP로 랭크를 계산하며 0 아래로는 내려가지 않습니다.
+  // 다이아몬드 이상은 누적 LP로 랭크를 계산하며 0 아래로는 내려가지 않습니다.
   g.rank.lp=Math.max(0,Math.round(g.rank.lp+amount));
   g.rank.tier=rankTierFromLp(g.rank.lp);
   g.rank.highest=Math.max(g.rank.highest,g.rank.tier);
@@ -377,7 +384,7 @@ function seasonAchievements(g,rng) {
 export function continueFromResult(state,rng=Math.random) {
  if(state.scene!=='result')throw Error('경기 결과 화면이 아닙니다.');
  const g=copy(state);g.career.totalTurns++;
- const seasonEnd=g.career.week>=WEEKS_PER_SEASON;
+ const seasonEnd=g.career.week>=weeksInCurrentPhase(g);
  if(!seasonEnd){
   g.career.week++;
   if(g.player.stage!=='pro'){
@@ -387,8 +394,10 @@ export function continueFromResult(state,rng=Math.random) {
   g.scene='main';return g;
  }
  if(g.player.stage==='pro'){
-  // 각 3주 시즌이 끝날 때 LCK / MSI / Worlds의 결산 화면을 보여줍니다.
+  // 1군 대회는 각각 1주가 끝나면 결산 화면을 보여줍니다.
   const t=ensureProCircuit(g);
+  // 이전 버전 진행 중 저장된 LCK는 남은 경기까지 집계하여 순위를 완성합니다.
+  if(t.phase==='lck'&&t.matches.length<45)runProWeek(g,rng,scorePower(g));
   const report=finishProPhase(g,rng,scorePower(g));
   if(t.phase==='msi'){
    if(report.lckChampion===g.career.team){
@@ -409,11 +418,11 @@ export function continueFromResult(state,rng=Math.random) {
   return retire(g,'계약이 만료되었고 새로운 영입 제안이 도착하지 않았다.');
  g.scene='main';return g;
 }
-/** 대회 결과를 읽고 다음 3주 대회로 진행합니다. 연속 Worlds 4회 우승이면 특별 엔딩입니다. */
+/** 대회 결과를 읽고 다음 1주 대회로 진행합니다. Worlds 통산 6회 우승이면 특별 엔딩입니다. */
 export function continueFromTournament(state,rng=Math.random) {
  if(state.scene!=='tournament'||state.player.stage!=='pro')throw Error('대회 결산 화면이 아닙니다.');
  const g=copy(state),t=ensureProCircuit(g);
- if(t.phase==='worlds'&&t.worldsStreak>=4)return retire(g,'Worlds 4년 연속 우승! 당신은 새로운 페이커가 되었습니다.');
+ if(t.phase==='worlds'&&t.worldsWins>=6)return retire(g,'Worlds 통산 6회 우승! 당신은 새로운 페이커가 되었습니다.');
  const yearEnded=t.phase==='worlds';
  advanceProPhase(g);
  if(yearEnded){
@@ -436,14 +445,14 @@ export function chooseGate(state,option,rng=Math.random) {
   if(gate.renewal)return retire(g,'계약 만료 후 입단 테스트를 포기했습니다.');
   g.scene='main';return g;
  }
- let prob=Math.min(.95,Math.max(.35,.65+(g.rank.lp/800)*.2+(averageStats(g)-20)*.005));
+ let prob=Math.min(.95,Math.max(.35,.65+(g.rank.lp/900)*.2+(averageStats(g)-20)*.005));
  if(option==='teamwork'){
   if(g.status.teamwork<20)throw Error('팀워크 20 이상이 필요합니다.');
   prob=Math.min(.98,prob+.1);
  }
  if(option==='focus')changeEffects(g,{stamina:-10,condition:-6});
  // 챌린저는 상위 세 팀의 1군 영입 테스트를 항상 통과하도록 합니다.
- const passed=g.rank.lp>=800||rng()<prob;
+ const passed=g.rank.lp>=900||rng()<prob;
  g.pendingGate=null;
  if(passed){
   g.offers=gate.offers||scoutingOffers(g,rng,{renewal:Boolean(gate.renewal)});
@@ -512,7 +521,7 @@ export function careerScore(g) {
 }
 export function careerGrade(g) {
   const sc=careerScore(g);
-  if(g.proCircuit?.worldsStreak>=4)return'FAKER';
+  if((g.proCircuit?.worldsWins||0)>=6)return'FAKER';
   if(sc>=1200)return'GOAT';if(sc>=750)return'레전드';if(sc>=430)return'스타';if(sc>=160)return'준수';return'무명';
 }
 export function retire(state,reason) {
@@ -534,47 +543,57 @@ export function hallEntry(g) {
 }
 export function formatMoney(amount) {return `${Number(amount||0).toLocaleString('ko-KR',{maximumFractionDigits:1})}억 원`;}
 
-/** 1.0 저장 파일을 2.0 규칙에 맞춰 변환합니다. 원본 객체는 변경하지 않습니다. */
+/** 이전 버전의 LP/최고 티어를 보존하며 4개 티어 규칙으로 옮깁니다. */
 export function migrateGame(raw) {
-  if(!raw||!raw.player||!raw.career||!raw.rank)return null;
-  if(raw.version===VERSION){
-    if(raw.career.week<=WEEKS_PER_SEASON)return raw;
-    const g=copy(raw);
-    g.career.week=WEEKS_PER_SEASON;
-    if(g.pending?.week>WEEKS_PER_SEASON)g.pending.week=WEEKS_PER_SEASON;
-    if(g.lastResult?.week>WEEKS_PER_SEASON)g.lastResult.week=WEEKS_PER_SEASON;
-    return g;
-  }
-  if(raw.version===2){
-    const g=copy(raw);g.version=VERSION;
-    if(g.player.stage==='pro')ensureProCircuit(g);
-    if(g.career.week>WEEKS_PER_SEASON)g.career.week=WEEKS_PER_SEASON;
-    return g;
-  }
-  if(raw.version!==1)return null;
-  const g=copy(raw);
-  const oldToNew=n=>n>=6?2:n===5?1:0;
-  const oldTier=Number(g.rank.tier)||0;
-  const oldLp=Number(g.rank.lp)||0;
-  g.rank.tier=oldToNew(oldTier);
-  g.rank.lp=([0,400,800][g.rank.tier]||0)+(oldTier>=4?oldLp:0);
-  g.rank.highest=oldToNew(Number(g.rank.highest)||0);
-  g.career.week=Math.max(1,Math.min(WEEKS_PER_SEASON,Math.ceil(g.career.week/2)));
-  g.career.recoveryTurns=0;g.career.recoveryReason=null;
-  if(g.pending?.week)g.pending.week=g.career.week;
-  if(g.lastResult?.week)g.lastResult.week=Math.max(1,Math.min(WEEKS_PER_SEASON,Math.ceil(g.lastResult.week/2)));
-  if(g.lastResult?.rank){
-    const r=g.lastResult.rank;
-    r.beforeTier=oldToNew(Number(r.beforeTier)||0);
-    r.afterTier=oldToNew(Number(r.afterTier)||0);
-    r.beforeLp=([0,400,800][r.beforeTier]||0)+(oldTier>=4?Number(r.beforeLp)||0:0);
-    r.afterLp=g.rank.lp;
-  }
-  g.version=VERSION; if(g.player.stage==='pro')ensureProCircuit(g);return g;
+ if(!raw||!raw.player||!raw.career||!raw.rank)return null;
+ if(raw.version===VERSION){
+   if(raw.career.week<=weeksInCurrentPhase(raw))return raw;
+   const g=copy(raw);g.career.week=weeksInCurrentPhase(g);
+   if(g.pending?.week>weeksInCurrentPhase(g))g.pending.week=weeksInCurrentPhase(g);
+   if(g.lastResult?.week>weeksInCurrentPhase(g))g.lastResult.week=weeksInCurrentPhase(g);
+   return g;
+ }
+ if(![1,2,3].includes(raw.version))return null;
+ const g=copy(raw);
+ if(raw.version===1){
+   // 1.0 아이언~챌린저 티어를 기존 v3 누적 LP로 먼저 변환.
+   const oldToV3=n=>n>=6?2:n===5?1:0;
+   const oldTier=Number(g.rank.tier)||0,oldLp=Number(g.rank.lp)||0;
+   g.rank.lp=([0,400,800][oldToV3(oldTier)]||0)+(oldTier>=4?oldLp:0);
+   g.rank.highest=oldToV3(Number(g.rank.highest)||0);
+   g.career.week=Math.max(1,Math.min(WEEKS_PER_SEASON,Math.ceil(g.career.week/2)));
+   if(g.pending?.week)g.pending.week=g.career.week;
+   if(g.lastResult?.week)g.lastResult.week=Math.max(1,Math.min(WEEKS_PER_SEASON,Math.ceil(g.lastResult.week/2)));
+   if(g.lastResult?.rank){
+      const r=g.lastResult.rank;
+      r.beforeLp=([0,400,800][oldToV3(Number(r.beforeTier)||0)]||0)+(oldTier>=4?Number(r.beforeLp)||0:0);
+      r.afterLp=g.rank.lp;
+      r.beforeTier=oldToV3(Number(r.beforeTier)||0);
+      r.afterTier=oldToV3(Number(r.afterTier)||0);
+   }
+ }
+ // v2/v3 마스터 0LP → v4 마스터 100LP. 다른 구간도 +100 유지.
+ g.rank.lp=Math.max(0,(Number(g.rank.lp)||0)+100);
+ g.rank.tier=rankTierFromLp(g.rank.lp);
+ g.rank.highest=Math.max(g.rank.tier,Math.min(3,(Number(g.rank.highest)||0)+1));
+ if(g.lastResult?.rank){
+   const r=g.lastResult.rank;
+   if(Number.isFinite(Number(r.beforeLp)))r.beforeLp=Number(r.beforeLp)+100;
+   if(Number.isFinite(Number(r.afterLp)))r.afterLp=Number(r.afterLp)+100;
+   if(r.beforeTier!==undefined)r.beforeTier=rankTierFromLp(r.beforeLp??g.rank.lp);
+   if(r.afterTier!==undefined)r.afterTier=rankTierFromLp(r.afterLp??g.rank.lp);
+ }
+ g.career.recoveryTurns??=0;g.career.recoveryReason??=null;
+ g.version=VERSION;
+ if(g.player.stage==='pro')ensureProCircuit(g);
+ if(g.career.week>weeksInCurrentPhase(g))g.career.week=weeksInCurrentPhase(g);
+ return g;
 }
 export const migrateHallEntry = entry => {
-  if(!entry||typeof entry!=='object')return entry;
-  if(entry.version===VERSION)return entry;
-  if(entry.version===2)return {...entry,version:VERSION,worldsWins:entry.worldsWins||0};
-  return {...entry,highest:entry.highest>=6?2:entry.highest===5?1:0,version:VERSION};
+ if(!entry||typeof entry!=='object')return entry;
+ if(entry.version===VERSION)return entry;
+ const highest=entry.version===1
+   ? (entry.highest>=6?3:entry.highest===5?2:1)
+   : Math.min(3,(Number(entry.highest)||0)+1);
+ return {...entry,highest,version:VERSION,worldsWins:entry.worldsWins||0};
 };

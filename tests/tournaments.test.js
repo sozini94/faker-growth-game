@@ -7,30 +7,28 @@ function pro(name='프로',team='t1'){
  const g=createGame(name,'mid');g.player.stage='pro';g.career.team=team;g.career.contractRemaining=10;g.proCircuit=initProCircuit(g);return g;
 }
 function playSeason(g){
- for(let k=0;k<3;k++){
-  g=startTraining(g,'study',[],random);
-  assert.equal(g.scene,'result');
-  g=continueFromResult(g,random);
-  if(k<2)assert.equal(g.scene,'main');
- }
- assert.equal(g.scene,'tournament');return g;
+ g=startTraining(g,'study',[],random);
+ assert.equal(g.scene,'result');
+ g=continueFromResult(g,random);
+ assert.equal(g.scene,'tournament');
+ return g;
 }
-test('2026년 대회 순서: LCK → MSI → Worlds, 한 대회는 3주',()=>{
+test('1군 1년: LCK 1주 → MSI 1주 → Worlds 1주',()=>{
  let g=pro();assert.deepEqual(Object.keys(PHASE_NAMES),['lck','msi','worlds']);
  for(const phase of ['lck','msi','worlds']){
   assert.equal(g.proCircuit.phase,phase);
+  assert.equal(g.career.week,1);
   g=playSeason(g);
   assert.equal(g.proCircuit.currentReport.phase,phase);
   g=continueFromTournament(g,random);
  }
  assert.equal(g.proCircuit.year,2);assert.equal(g.proCircuit.phase,'lck');assert.equal(g.player.age,18);
+ assert.equal(g.career.totalTurns,3);
 });
 test('LCK 10팀 단일라운드 45경기, 각 팀 9경기, 1~10위',()=>{
  let g=pro();g.career.week=1;
- for(let week=1;week<=3;week++){
-  g.career.week=week;const weekResult=runProWeek(g,random,40);
-  assert.equal(weekResult.played.length,3);
- }
+ const weekResult=runProWeek(g,random,40);
+ assert.equal(weekResult.played.length,9);
  assert.equal(g.proCircuit.matches.length,45);
  assert.equal(g.proCircuit.standings.length,10);
  assert.deepEqual(g.proCircuit.standings.map(x=>x.place),[1,2,3,4,5,6,7,8,9,10]);
@@ -42,7 +40,7 @@ test('LCK 10팀 단일라운드 45경기, 각 팀 9경기, 1~10위',()=>{
 });
 test('MSI 본선 11팀, 탈락 팀은 진출로 표시되지 않음',()=>{
  let g=pro('하위팀','dn');
- for(let w=1;w<=3;w++){g.career.week=w;runProWeek(g,random,20);}
+ runProWeek(g,random,20);
  const lck=finishProPhase(g,random,20);
  assert.equal(lck.qualified,lck.qualifiers.includes('dn'));
  advanceProPhase(g);
@@ -51,28 +49,44 @@ test('MSI 본선 11팀, 탈락 팀은 진출로 표시되지 않음',()=>{
  assert.equal(msi.worldsSeeds.includes('dn'),msi.qualifiedWorlds);
 });
 test('Worlds 출전 팀 19개와 8강·4강·결승 7개의 토너먼트 결과',()=>{
- let g=pro();for(let w=1;w<=3;w++){g.career.week=w;runProWeek(g,random,60);}
+ let g=pro();runProWeek(g,random,60);
  finishProPhase(g,random,60);advanceProPhase(g);finishProPhase(g,random,60);advanceProPhase(g);
  const r=finishProPhase(g,random,60);
  assert.equal(r.participants.length,19);assert.equal(new Set(r.participants).size,19);
  assert.equal(r.knockout.length,7);
  assert.equal(r.streak, r.won?1:0);
 });
-test('Worlds 연속 우승 4년이면 페이커 특별 엔딩; 3년은 종료되지 않음',()=>{
+test('Worlds 6회 통산 우승 시 FAKER 엔딩; 비연속 5회는 종료되지 않음',()=>{
  let g=pro();g.scene='tournament';g.proCircuit.phase='worlds';
- g.proCircuit.worldsStreak=3;g.proCircuit.worldsWins=3;
+ g.proCircuit.worldsStreak=1;g.proCircuit.worldsWins=5;
  let next=continueFromTournament(g,random);
  assert.equal(next.scene,'main');assert.equal(next.proCircuit.year,2);
- g.proCircuit.worldsStreak=4;g.proCircuit.worldsWins=4;
+ g.proCircuit.worldsStreak=1;g.proCircuit.worldsWins=6;
  next=continueFromTournament(g,random);
  assert.equal(next.scene,'ending');assert.equal(next.ending.grade,'FAKER');
  assert.equal(careerGrade(next),'FAKER');
- assert.match(next.ending.reason,/4년 연속/);
+ assert.match(next.ending.reason,/통산 6회/);
+});
+test('1군 이전은 3주 시즌 그대로 유지된다',()=>{
+ let g=createGame('학생','mid');
+ g=startTraining(g,'study',[],random);g=continueFromResult(g,random);
+ assert.equal(g.career.week,2);assert.equal(g.scene,'main');
+});
+test('v6 프로 진행 중 저장파일을 1주차로 변환하고 LCK 남은 경기만 처리한다',()=>{
+ let old=pro();old.career.week=3;old.proCircuit.rounds=[];
+ old.career.week=1;runProWeek(old,random,40);
+ old.proCircuit.matches=old.proCircuit.matches.slice(0,15);
+ old.career.week=3;
+ const migrated=migrateGame(old);
+ assert.equal(migrated.career.week,1);
+ const r=runProWeek(migrated,random,40);
+ assert.equal(migrated.proCircuit.matches.length,45);
+ assert.equal(r.standings.length,10);
 });
 test('기존 v2 저장 데이터가 1군 대회 커리어로 이행됨',()=>{
  let old=pro();old.version=2;delete old.proCircuit;
  const converted=migrateGame(old);
- assert.equal(converted.version,3);assert.equal(converted.proCircuit.phase,'lck');
+ assert.equal(converted.version,4);assert.equal(converted.proCircuit.phase,'lck');
 });
 
 test('LCK 플레이오프 10경기는 실제 대진 승패와 1~6위가 일치한다',()=>{
@@ -90,7 +104,7 @@ test('LCK 플레이오프 10경기는 실제 대진 승패와 1~6위가 일치�
 });
 test('MSI 4팀 플레이인과 8팀 본선 기록, LCK 플레이오프 시드가 보고서에 남는다',()=>{
  const g=pro();
- for(let w=1;w<=3;w++){g.career.week=w;runProWeek(g,random,55);}
+ runProWeek(g,random,55);
  finishProPhase(g,random,55);advanceProPhase(g);
  const r=finishProPhase(g,random,55);
  assert.equal(r.msiField.length,11);

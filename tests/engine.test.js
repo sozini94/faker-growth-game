@@ -4,34 +4,35 @@ import {readFileSync} from 'node:fs';
 import {
  VERSION,TIERS,TEAMS,POSITIONS,TRAININGS,WEEKS_PER_SEASON,RANK_THRESHOLDS,
  createGame,winChance,startTraining,chooseEvent,meetsRequirements,
- continueFromResult,chooseGate,acceptOffer,rejectOffer,careerScore,marketValue,
+ continueFromResult,continueFromTournament,chooseGate,acceptOffer,rejectOffer,careerScore,marketValue,
  rankProgress,migrateGame,migrateHallEntry
 } from '../src/engine.js';
 const events=JSON.parse(readFileSync(new URL('../src/data/events.json',import.meta.url)));
 const zero=()=>0;
 const high=()=>.99;
 
-test('마스터부터 시작하고 티어는 최상위 3종, 한 시즌 3주',()=>{
- assert.equal(VERSION,3);
+test('다이아몬드 시작, 4개 티어와 3주 시즌',()=>{
+ assert.equal(VERSION,4);
  assert.equal(WEEKS_PER_SEASON,3);
- assert.deepEqual(TIERS.map(t=>t.name),['마스터','그랜드마스터','챌린저']);
- assert.deepEqual(RANK_THRESHOLDS,[0,400,800]);
+ assert.deepEqual(TIERS.map(t=>t.name),['다이아몬드','마스터','그랜드마스터','챌린저']);
+ assert.deepEqual(RANK_THRESHOLDS,[0,100,500,900]);
  assert.equal(POSITIONS.length,5);
  assert.equal(TRAININGS.length,4);
  assert.ok(events.length>=20);
  assert.ok(TIERS.every(t=>t.logo.includes('ranked-emblem/emblem-')));
  assert.ok(TEAMS.every(t=>t.logo.startsWith('https://')));
 });
-test('초기 미드 스탯과 마스터 0LP',()=>{
+test('초기 미드 스탯과 다이아몬드 0LP',()=>{
  const g=createGame('테스트','mid');
  assert.equal(g.stats.lane,15);assert.equal(g.stats.map,15);
  assert.equal(g.stats.fight,10);assert.equal(g.status.stamina,100);
  assert.equal(g.player.age,17);assert.equal(g.rank.lp,0);assert.equal(g.rank.tier,0);
 });
-test('마스터 LP 표시: 0~400, 그랜드마스터 400~800, 챌린저 이후',()=>{
- assert.deepEqual(rankProgress(0),{tier:0,low:0,high:400,percent:0});
- assert.deepEqual(rankProgress(400),{tier:1,low:400,high:800,percent:0});
- assert.deepEqual(rankProgress(800),{tier:2,low:800,high:null,percent:100});
+test('다이아몬드/마스터/그랜드마스터/챌린저 진행도',()=>{
+ assert.deepEqual(rankProgress(0),{tier:0,low:0,high:100,percent:0});
+ assert.deepEqual(rankProgress(100),{tier:1,low:100,high:500,percent:0});
+ assert.deepEqual(rankProgress(500),{tier:2,low:500,high:900,percent:0});
+ assert.deepEqual(rankProgress(900),{tier:3,low:900,high:null,percent:100});
 });
 test('승률 공식 컨디션과 최솟값 15%, 최댓값 85%',()=>{
  assert.ok(Math.abs(winChance(20,15,70)-.56)<.000001);
@@ -42,17 +43,17 @@ test('솔로랭크 10판, 초기 180LP + 다음 주로 진행',()=>{
  let g=createGame('승리의 신인','mid');
  g=startTraining(g,'solo',[],zero);
  assert.equal(g.scene,'result');assert.equal(g.lastResult.rank.wins,10);
- assert.equal(g.rank.tier,0);assert.ok(g.rank.lp>0);
+ assert.equal(g.rank.tier,1);assert.ok(g.rank.lp>=100);
  assert.equal(g.status.stamina,85);assert.equal(g.status.condition,65);
  g=continueFromResult(g,high);assert.equal(g.career.week,2);
 });
-test('LP 400/800 기준 승급 및 강등, 마스터 최저 0',()=>{
+test('LP 100/500/900 기준 승급 및 강등, 다이아 최저 0',()=>{
  let g=createGame('승급','top');g.player.stage='pro';g.career.team='t1';g.career.contractRemaining=3;
- g.rank.lp=390;g=startTraining(g,'solo',[],zero);
- assert.equal(g.rank.tier,1);assert.equal(g.lastResult.rank.promotion,true);
- g=continueFromResult(g,high);g.rank.lp=795;g.rank.tier=1;
- g=startTraining(g,'solo',[],zero);assert.equal(g.rank.tier,2);
- g=continueFromResult(g,high);g.rank.lp=1;g.rank.tier=0;
+ g.rank.lp=490;g.rank.tier=1;g=startTraining(g,'solo',[],zero);
+ assert.equal(g.rank.tier,2);assert.equal(g.lastResult.rank.promotion,true);
+ g=continueFromResult(g,high);g=continueFromTournament(g,high);g.rank.lp=895;g.rank.tier=2;
+ g=startTraining(g,'solo',[],zero);assert.equal(g.rank.tier,3);
+ g=continueFromResult(g,high);g=continueFromTournament(g,high);g.rank.lp=1;g.rank.tier=0;
  g=startTraining(g,'solo',[],high);
  assert.equal(g.rank.tier,0);assert.equal(g.rank.lp,0);
 });
@@ -132,10 +133,10 @@ test('이적 제안 거절 시 은퇴 처리',()=>{
 test('1.0 저장 데이터 및 명예의 전당 기록 이전',()=>{
  const old=createGame('기존','top');old.version=1;old.rank={tier:5,lp:65,highest:6};old.career.week=7;
  const migrated=migrateGame(old);
- assert.equal(migrated.version,3);assert.equal(migrated.rank.tier,1);assert.equal(migrated.rank.lp,465);
- assert.equal(migrated.rank.highest,2);assert.equal(migrated.career.week,3);
+ assert.equal(migrated.version,4);assert.equal(migrated.rank.tier,2);assert.equal(migrated.rank.lp,565);
+ assert.equal(migrated.rank.highest,3);assert.equal(migrated.career.week,3);
  assert.equal(old.rank.lp,65);
- assert.equal(migrateHallEntry({highest:6}).highest,2);
+ assert.equal(migrateHallEntry({highest:6,version:1}).highest,3);
 });
 test('시장가치 계산과 커리어 점수',()=>{
  let g=createGame('선수','bot');const a=marketValue(g);g.player.age=32;
@@ -156,4 +157,13 @@ test('랜덤 성장 결과가 자동으로 기록됨',()=>{
  assert.equal(rest.lastResult.trainingGains.mental,2);
  const oldGame=createGame('4주 저장','mid'); oldGame.career.week=4;
  assert.equal(migrateGame(oldGame).career.week,3);
+});
+
+test('v7 마스터/그랜드마스터/챌린저 저장 기록은 v8에서도 티어와 LP 진행도를 보존',()=>{
+ for(const [lp,expectedTier] of [[0,1],[399,1],[400,2],[800,3]]){
+   const old=createGame('이전기록','mid');old.version=3;old.rank.lp=lp;old.rank.tier=lp>=800?2:lp>=400?1:0;old.rank.highest=old.rank.tier;
+   const migrated=migrateGame(old);
+   assert.equal(migrated.version,4);assert.equal(migrated.rank.lp,lp+100);assert.equal(migrated.rank.tier,expectedTier);
+   assert.equal(migrated.rank.highest,expectedTier);assert.equal(old.rank.lp,lp);
+ }
 });
