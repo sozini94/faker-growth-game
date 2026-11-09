@@ -164,10 +164,10 @@ function simulateSolo(g,rng) {
   const beforeTier=g.rank.tier,beforeLp=g.rank.lp;
   let wins=0,losses=0;
   for(let i=0;i<10;i++) {
-    const opponent=13+g.rank.tier*10+g.rank.lp*.032;
+    const opponent=13+g.rank.tier*10+g.rank.lp*.028;
     const win=rng()<winChance(scorePower(g),opponent,g.status.condition);
-    if(win){wins++;g.career.rankWins++;updateRank(g,roll(rng,18,22));}
-    else {losses++;g.career.rankLosses++;updateRank(g,-roll(rng,15,19));}
+    if(win){wins++;g.career.rankWins++;updateRank(g,roll(rng,40,90));}
+    else {losses++;g.career.rankLosses++;updateRank(g,-roll(rng,20,40));}
   }
   const promotion=g.rank.tier>beforeTier, demotion=g.rank.tier<beforeTier;
   if(wins>=7)changeEffects(g,{popularity:2});
