@@ -65,3 +65,9 @@
 .tour-winner .team-logo,.pro-award p .team-logo,.tour-logs .team-logo{vertical-align:middle;display:inline-grid;width:31px;height:31px;margin:0 3px}
 .tournament-match .win .team-logo{width:24px;height:24px}
 @media(max-width:420px){.international-team-list{grid-template-columns:repeat(2,minmax(0,1fr))}.international-team-item{font-size:10px;padding:6px;gap:5px}.international-team-item .team-logo{flex-basis:30px;width:30px;height:30px}}
+
+/* Mobile title/menu tapping reliability */
+.title-actions{z-index:5}
+.title-actions button,.action-bar button{position:relative;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+#new-game-modal{z-index:40}
+#new-game-modal .dialog{max-width:420px}

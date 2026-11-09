@@ -284,9 +284,30 @@ function render(){
  app.innerHTML=shell(content,current);
 }
 function routePage(next){page=next;render();window.scrollTo({top:0,behavior:'instant'});}
+function beginNewGame(){
+  createName='';
+  createPosition='mid';
+  document.querySelector('#new-game-modal')?.remove();
+  routePage('create');
+}
 function confirmNew(){
- if(game?.scene && game.scene!=='ending')return window.confirm('진행 중인 게임을 종료하고 새 게임을 시작할까요? 현재 진행 기록은 덮어써집니다.');
- return true;
+  if(!game?.scene || game.scene==='ending'){
+    beginNewGame();
+    return;
+  }
+  // Mobile browsers and embedded webviews can block native window.confirm.
+  // Render an in-game dialog instead; do not touch existing saves until Start.
+  document.querySelector('#new-game-modal')?.remove();
+  app.insertAdjacentHTML('beforeend', `<div class="dialog-backdrop" id="new-game-modal">
+    <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="new-game-title">
+      <div class="dialog-head"><h3 id="new-game-title">새 게임 시작</h3></div>
+      <p class="soft">진행 중인 게임을 종료하고 새 게임을 시작할까요? 새 선수를 시작하면 현재 진행 기록이 덮어써집니다.</p>
+      <div class="action-bar">
+        <button type="button" class="btn dark" data-action="cancel-new-game">취소</button>
+        <button type="button" class="btn primary" data-action="confirm-new-game">새 게임 시작</button>
+      </div>
+    </div>
+  </div>`);
 }
 function exportSaves(){
  const obj={format:'faker-growth-save',version:VERSION,exportedAt:new Date().toISOString(),game,hall};
@@ -318,7 +339,9 @@ app.addEventListener('click',e=>{
  switch(action){
    case 'home':routePage('title');break;
    case 'hall':routePage('hall');break;
-   case 'new-game':if(confirmNew()){createName='';createPosition='mid';routePage('create');}break;
+   case 'new-game':confirmNew();break;
+   case 'confirm-new-game':beginNewGame();break;
+   case 'cancel-new-game':document.querySelector('#new-game-modal')?.remove();break;
    case 'continue-game':if(game){archiveEnding();routePage('game')}break;
    case 'choose-position':createPosition=b.dataset.id;render();document.querySelector('.role-card.selected')?.scrollIntoView({block:'nearest',inline:'nearest'});break;
    case 'start-game':{
