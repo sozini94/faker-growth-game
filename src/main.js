@@ -114,7 +114,7 @@ function renderMain(){
    <div class="wide-banner main-banner" style="background-image:linear-gradient(90deg,rgba(6,11,29,.2),rgba(6,11,29,.06)),url('${img('arena.webp')}')"><div class="banner-bottom"><span class="chip">${stageInfo(g.player.stage).name}</span><b>${team?h(team.name):'프로의 무대를 향해'}</b></div></div>
    ${g.career.gateMessage?`<div class="notice"><span>✦</span>${h(g.career.gateMessage)}<button class="text-icon" data-action="dismiss-notice" aria-label="알림 닫기">×</button></div>`:''}
    <div class="profile-layout">
-      ${section(`<div class="portrait-frame"><img src="${img('player.webp')}" alt="페이커를 모티브로 만든 선수 픽셀 아트"/></div><div class="profile-name"><span>${h(g.player.name)}</span><small>${positionInfo(g.player.position).name} · ${stageInfo(g.player.stage).name}</small></div>`,'profile-panel')}
+      ${section(`<div class="portrait-frame"><img src="${img(positionInfo(g.player.position).asset)}" alt="${positionInfo(g.player.position).name} 선수 프로필"/></div><div class="profile-name"><span>${h(g.player.name)}</span><small>${positionInfo(g.player.position).name} · ${stageInfo(g.player.stage).name}</small></div>`,'profile-panel')}
       ${section(`${labelHeading('▥','기본 능력치')}<div class="stat-list">${STATS.map(s=>bar(s.name,s.icon,g.stats[s.key],s.key==='lane'?'#fa6483':'#9ab0e3')).join('')}</div><div class="power-total">종합 전투력 <strong>${scorePower(g).toFixed(1)}</strong></div>`,'stats-panel')}
    </div>
    <div class="rank-layout">
