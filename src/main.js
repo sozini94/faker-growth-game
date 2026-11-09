@@ -108,7 +108,7 @@ function titleScreen(){
   <p class="fine-print">본 작품은 비공식 팬메이드 프로토타입이며, 실제 선수와 구단의 보증·제휴를 의미하지 않습니다. 게임 수치는 모두 가상의 시뮬레이션입니다.</p>
  </div>`;
 }
-function createScreen(){c
+function createScreen(){
  const pos=positionInfo(createPosition);
  const bonus=Object.keys(pos.weights).sort((a,b)=>pos.weights[b]-pos.weights[a]).slice(0,2);
  return `<div class="page-body">
