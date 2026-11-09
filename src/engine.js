@@ -1,14 +1,21 @@
 /** 게임 규칙/상태 변경만 담당하는 모듈. DOM과 localStorage에 의존하지 않습니다. */
-export const VERSION = 1;
+export const VERSION = 2;
+export const WEEKS_PER_SEASON = 4;
+export const RANK_THRESHOLDS = [0,400,800];
 export const TIERS = [
-  {id:'iron',name:'아이언',color:'#9a9cae',symbol:'◆'},
-  {id:'bronze',name:'브론즈',color:'#cc916a',symbol:'⬟'},
-  {id:'silver',name:'실버',color:'#b7d8e8',symbol:'✦'},
-  {id:'gold',name:'골드',color:'#f4c351',symbol:'✧'},
-  {id:'master',name:'마스터',color:'#b58aff',symbol:'✦'},
-  {id:'grandmaster',name:'그랜드마스터',color:'#f77778',symbol:'✹'},
-  {id:'challenger',name:'챌린저',color:'#76ceff',symbol:'♛'},
+  {id:'master',name:'마스터',color:'#b58aff',symbol:'✦',minLp:0,
+    logo:'https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-static-assets/global/default/images/ranked-emblem/emblem-master.png'},
+  {id:'grandmaster',name:'그랜드마스터',color:'#f77778',symbol:'✹',minLp:400,
+    logo:'https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-static-assets/global/default/images/ranked-emblem/emblem-grandmaster.png'},
+  {id:'challenger',name:'챌린저',color:'#76ceff',symbol:'♛',minLp:800,
+    logo:'https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-static-assets/global/default/images/ranked-emblem/emblem-challenger.png'},
 ];
+export const rankTierFromLp = lp => lp>=800?2:lp>=400?1:0;
+export function rankProgress(lp) {
+  const tier=rankTierFromLp(lp),low=RANK_THRESHOLDS[tier];
+  const high=tier===TIERS.length-1?null:RANK_THRESHOLDS[tier+1];
+  return {tier,low,high,percent:high===null?100:Math.max(0,Math.min(100,Math.round((lp-low)/(high-low)*100)))};
+}
 export const STATS = [
   {key:'lane',name:'라인전',icon:'⚔'},
   {key:'fight',name:'한타',icon:'✹'},
@@ -23,23 +30,26 @@ export const POSITIONS = [
   {id:'bot',name:'원딜',pro:'Peyz',icon:'➳',asset:'role-bot.webp',desc:'후반 한타를 지배하는 결정적인 딜러',weights:{lane:.20,fight:.35,map:.10,mental:.25,champ:.10}},
   {id:'support',name:'서폿',pro:'Keria',icon:'✚',asset:'role-support.webp',desc:'팀워크와 맵 리딩으로 판을 설계하는 조력자',weights:{lane:.05,fight:.25,map:.35,mental:.15,champ:.20}},
 ];
+// 2026 LCK 실존 팀의 공식/위키미디어/리그피디아 로고 URL. 자산 소유권은 각 구단에 있습니다.
+const commons = file => `https://commons.wikimedia.org/wiki/Special:Redirect/file/${encodeURIComponent(file)}`;
+const leaguepedia = file => `https://lol.fandom.com/wiki/Special:Redirect/file/${encodeURIComponent(file)}`;
 export const TEAMS = [
-  {id:'t1',name:'T1',short:'T1',color:'#ff405f'},
-  {id:'geng',name:'Gen.G',short:'GEN',color:'#edc56c'},
-  {id:'hle',name:'Hanwha Life Esports',short:'HLE',color:'#ff9e59'},
-  {id:'dk',name:'Dplus KIA',short:'DK',color:'#acd7ff'},
-  {id:'kt',name:'KT Rolster',short:'KT',color:'#ec646e'},
-  {id:'drx',name:'KIWOOM DRX',short:'DRX',color:'#91acd9'},
-  {id:'ns',name:'Nongshim RedForce',short:'NS',color:'#ef5c5d'},
-  {id:'bnk',name:'BNK FEARX',short:'BFX',color:'#a8e9dd'},
-  {id:'dn',name:'DN SOOPers',short:'DN',color:'#8fcbff'},
-  {id:'bro',name:'HANJIN BRION',short:'BRO',color:'#b5e3ab'},
+  {id:'t1',name:'T1',short:'T1',color:'#ff405f',logo:commons('T1 esports logo.svg')},
+  {id:'geng',name:'Gen.G',short:'GEN',color:'#edc56c',logo:commons('Gen.G Logo.svg')},
+  {id:'hle',name:'Hanwha Life Esports',short:'HLE',color:'#ff9e59',logo:commons('Hanwha Life Esports logo.svg')},
+  {id:'dk',name:'Dplus KIA',short:'DK',color:'#acd7ff',logo:commons('DPlus KIA Logo.svg')},
+  {id:'kt',name:'KT Rolster',short:'KT',color:'#ec646e',logo:leaguepedia('KT Rolsterlogo profile.png')},
+  {id:'drx',name:'KIWOOM DRX',short:'DRX',color:'#91acd9',logo:leaguepedia('Kiwoom DRXlogo profile.png')},
+  {id:'ns',name:'Nongshim RedForce',short:'NS',color:'#ef5c5d',logo:'https://static.wikia.nocookie.net/lolesports_gamepedia_en/images/b/b8/Nongshim_RedForcelogo_square.png/revision/latest?cb=20260114093156'},
+  {id:'bnk',name:'BNK FEARX',short:'BFX',color:'#a8e9dd',logo:'https://static.wixstatic.com/media/b625f3_54c9266e5ccf45fd8b1fcb7647cfdb2a~mv2.png'},
+  {id:'dn',name:'DN SOOPers',short:'DNS',color:'#8fcbff',logo:leaguepedia('DN SOOPerslogo profile.png')},
+  {id:'bro',name:'HANJIN BRION',short:'BRO',color:'#b5e3ab',logo:leaguepedia('HANJIN BRIONlogo profile.png')},
 ];
 export const STAGES = [
-  {id:'student',name:'학생',next:'trainee',gateTier:1,gatePower:13},
-  {id:'trainee',name:'연습생',next:'academy',gateTier:2,gatePower:19},
-  {id:'academy',name:'2군',next:'pro',gateTier:3,gatePower:26},
-  {id:'pro',name:'1군',next:null,gateTier:6,gatePower:100},
+  {id:'student',name:'학생',next:'trainee',gateTier:0,gatePower:15},
+  {id:'trainee',name:'연습생',next:'academy',gateTier:0,gatePower:22},
+  {id:'academy',name:'2군',next:'pro',gateTier:1,gatePower:29},
+  {id:'pro',name:'1군',next:null,gateTier:2,gatePower:100},
 ];
 export const TRAININGS = [
   {id:'solo',name:'솔로랭크',icon:'⚔',desc:'10게임 일괄 진행 · 티어 상승',className:'red',effects:{lane:2,fight:1,stamina:-15,condition:-5}},
@@ -64,7 +74,7 @@ export const tierInfo=tier=>TIERS[tier]||TIERS[0];
 export const seasonName=s=>s%2===1?'스프링':'서머';
 export const scorePower=g=>playerKeys.reduce((sum,k)=>sum+g.stats[k]*$pos(g.player.position).weights[k],0);
 export const winChance=(power,opponent,condition)=>Math.min(.85,Math.max(.15,.5+.004*(power-opponent)+.002*(condition-50)));
-export const tierRatio=g=>Math.round(g.rank.lp);
+export const tierRatio=g=>rankProgress(g.rank.lp).percent;
 export const averageStats=g=>playerKeys.reduce((s,k)=>s+g.stats[k],0)/5;
 export const rankIndexFromName=id=>TIERS.findIndex(t=>t.id===id);
 export function createGame(name,position='mid') {
@@ -79,7 +89,7 @@ export function createGame(name,position='mid') {
     rank:{tier:0,lp:0,highest:0},
     career:{season:1,week:1,totalTurns:0,team:null,contractRemaining:0,salary:0,totalSalary:0,
       matchWins:0,matchLosses:0,championships:0,rankWins:0,rankLosses:0,marketValue:45,
-      teamHistory:[],scoreLog:[],slumpRecovered:0,injuryTurns:0,injuries:0,gateFailures:0},
+      teamHistory:[],scoreLog:[],slumpRecovered:0,injuryTurns:0,injuries:0,gateFailures:0,recoveryTurns:0,recoveryReason:null},
     pending:null,pendingEvent:null,pendingGate:null,offers:[],marketTarget:null,lastResult:null,ending:null,history:[],
     createdAt:new Date().toISOString(),
   };
@@ -110,7 +120,11 @@ export function marketValue(g) {
   return clamp(.5*R+.3*F+.2*G-D,0,100);
 }
 function syncValue(g) {g.career.marketValue=marketValue(g);}
-export const isTrainingUnlocked=(g,id)=>id!=='team'||g.player.stage!=='student';
+export const isTrainingUnlocked=(g,id)=>{
+  if((g.career.recoveryTurns>0||g.status.stamina<=0||g.status.condition<=0)&&id!=='rest')return false;
+  if(g.career.injuryTurns>0&&!['rest','study'].includes(id))return false;
+  return id!=='team'||g.player.stage!=='student';
+};
 function weightedRandom(events,rng) {
   const total=events.reduce((v,e)=>v+(e.weight||1),0);
   let target=rng()*total;
@@ -141,18 +155,16 @@ export function meetsRequirements(g,requires={}) {
   });
 }
 function updateRank(g,amount) {
-  const max=TIERS.length-1;
-  g.rank.lp+=amount;
-  while(g.rank.lp>=100&&g.rank.tier<max) {g.rank.lp-=100;g.rank.tier++;}
-  while(g.rank.lp<0&&g.rank.tier>0) {g.rank.lp+=100;g.rank.tier--;}
-  g.rank.lp=clamp(g.rank.lp,0,g.rank.tier===max?100:99.9);
+  // 마스터 이상은 누적 LP로 랭크를 계산하며 0 아래로는 내려가지 않습니다.
+  g.rank.lp=Math.max(0,Math.round(g.rank.lp+amount));
+  g.rank.tier=rankTierFromLp(g.rank.lp);
   g.rank.highest=Math.max(g.rank.highest,g.rank.tier);
 }
 function simulateSolo(g,rng) {
   const beforeTier=g.rank.tier,beforeLp=g.rank.lp;
   let wins=0,losses=0;
   for(let i=0;i<10;i++) {
-    const opponent=11+g.rank.tier*12+g.rank.tier*g.rank.tier*2.8+g.rank.lp*.04;
+    const opponent=13+g.rank.tier*10+g.rank.lp*.032;
     const win=rng()<winChance(scorePower(g),opponent,g.status.condition);
     if(win){wins++;g.career.rankWins++;updateRank(g,roll(rng,18,22));}
     else {losses++;g.career.rankLosses++;updateRank(g,-roll(rng,15,19));}
@@ -161,7 +173,7 @@ function simulateSolo(g,rng) {
   if(wins>=7)changeEffects(g,{popularity:2});
   if(losses>=8)changeEffects(g,{condition:-4});
   return {wins,losses,beforeTier,beforeLp,afterTier:g.rank.tier,afterLp:g.rank.lp,promotion,demotion,
-    lpDelta:(g.rank.tier-beforeTier)*100+g.rank.lp-beforeLp};
+    lpDelta:g.rank.lp-beforeLp};
 }
 function simulateLeague(g,rng) {
   if(g.player.stage==='student')return null;
@@ -186,26 +198,41 @@ function injure(g,turns=2) {
   g.career.injuries++;
   changeEffects(g,{condition:-10});
 }
+/** 체력/컨디션 소진은 실제 경기 불참 + 다음 턴 강제 회복으로 연결됩니다. */
+function markExhaustion(g) {
+  const exhausted=g.status.stamina<=0 || g.status.condition<=0;
+  if(!exhausted)return false;
+  g.career.recoveryTurns=Math.max(g.career.recoveryTurns||0,1);
+  if(g.status.stamina<=0){
+    g.career.recoveryReason='체력 고갈 · 경기 불참 및 다음 주 강제 휴식';
+    if(g.career.injuryTurns<2)injure(g,2);
+  } else g.career.recoveryReason='컨디션 고갈 · 번아웃으로 경기 불참 및 다음 주 강제 휴식';
+  return true;
+}
 /** 훈련 선택을 하면 이벤트가 뜨거나 경기 결과로 이동합니다. */
 export function startTraining(state,trainingId,events=[],rng=Math.random) {
   if(state.scene!=='main')throw Error('현재는 훈련을 진행할 수 없습니다.');
   const tr=TRAININGS.find(t=>t.id===trainingId);
-  if(!tr||!isTrainingUnlocked(state,trainingId))throw Error('잠긴 훈련입니다.');
+  if(!tr||!isTrainingUnlocked(state,trainingId))throw Error('현재 상태에서는 해당 훈련을 진행할 수 없습니다.');
   const g=copy(state);
-  const isInjured=g.career.injuryTurns>0;
-  if(isInjured&&trainingId!=='rest'&&trainingId!=='study')throw Error('부상 회복 중에는 휴식과 영상 분석만 가능합니다.');
-  g.pending={trainingId,week:g.career.week,season:g.career.season,
+  const forcedRecovery=g.career.recoveryTurns>0||g.status.stamina<=0||g.status.condition<=0;
+  g.pending={trainingId,week:g.career.week,season:g.career.season,forcedRecovery,
     before:{stats:copy(g.stats),status:copy(g.status),rank:copy(g.rank)},eventName:null};
   changeEffects(g,tr.effects);
+  if(forcedRecovery){
+    // 0에서 정상 복귀할 수 있도록 일반 휴식보다 추가 회복을 제공.
+    changeEffects(g,{stamina:10,condition:15});
+    g.career.recoveryTurns=0;g.career.recoveryReason=null;
+    concludeTraining(g,rng);return g;
+  }
   if(g.status.stamina<30&&trainingId!=='rest')changeEffects(g,{condition:-6});
+  if(markExhaustion(g)){concludeTraining(g,rng);return g;}
   const eligible=events.filter(e=>eventEligible(g,e));
   const forcedRisk=g.status.stamina<25?.32:0;
   if(eligible.length && rng()<Math.max(.45,forcedRisk)) {
     const e=weightedRandom(eligible,rng);
     g.pendingEvent=e.id;g.pending.eventName=e.title;g.scene='event';
-  } else {
-    concludeTraining(g,rng);
-  }
+  } else concludeTraining(g,rng);
   return g;
 }
 /** 이벤트/승격 테스트의 조건 미충족 선택지는 엔진에서도 막습니다. */
@@ -225,21 +252,27 @@ export function chooseEvent(state,events,choiceIndex,rng=Math.random) {
   return g;
 }
 function concludeTraining(g,rng) {
-  const rankResult=g.pending.trainingId==='solo'?simulateSolo(g,rng):null;
-  const leagueResult=simulateLeague(g,rng);
+  const exhausted=markExhaustion(g);
+  const skipMatches=exhausted || Boolean(g.pending.forcedRecovery);
+  const reason=exhausted?g.career.recoveryReason:g.pending.forcedRecovery?'강제 회복 주간에는 경기 출전 없이 휴식합니다.':null;
+  const rankResult=skipMatches?null:g.pending.trainingId==='solo'?simulateSolo(g,rng):null;
+  const leagueResult=skipMatches?null:simulateLeague(g,rng);
+  // 경기 종료 후 0에 도달한 경우 다음 턴 강제 휴식으로 연결.
+  if(!skipMatches)markExhaustion(g);
   if(g.career.injuryTurns>0)g.career.injuryTurns=Math.max(0,g.career.injuryTurns-1);
   syncValue(g);
   g.lastResult={
     trainingId:g.pending.trainingId,season:g.career.season,week:g.career.week,
-    rank:rankResult,league:leagueResult,eventName:g.pending.eventName,eventChoice:g.pending.eventChoice,
+    rank:rankResult,league:leagueResult,missedMatch:skipMatches,forcedRecovery:Boolean(g.pending.forcedRecovery),
+    recoveryNote:reason,eventName:g.pending.eventName,eventChoice:g.pending.eventChoice,
     gains:{stats:Object.fromEntries(playerKeys.map(k=>[k,Math.round((g.stats[k]-g.pending.before.stats[k])*10)/10])),
       status:Object.fromEntries(statusKeys.map(k=>[k,Math.round((g.status[k]-g.pending.before.status[k])*10)/10]))},
-    highlight:leagueResult?(leagueResult.victory?'날카로운 판단과 침착한 운영으로 팀 승리에 기여했다.':'힘겨운 경기였다. 다음 주의 선택이 중요하다.')
+    highlight:reason|| (leagueResult?(leagueResult.victory?'날카로운 판단과 침착한 운영으로 팀 승리에 기여했다.':'힘겨운 경기였다. 다음 주의 선택이 중요하다.')
       :rankResult?(rankResult.wins>=6?'솔로랭크에서 좋은 흐름을 만들어냈다.':'치열한 솔로랭크. 약점을 보완할 시간이 필요하다.')
-      :'다음 경기를 위한 기반을 다진 한 주였다.'
+      :'다음 경기를 위한 기반을 다진 한 주였다.')
   };
   g.history.push({season:g.career.season,week:g.career.week,training:g.pending.trainingId,
-    rankWins:rankResult?.wins??null,leagueWin:leagueResult?.victory??null,event:g.pending.eventName||null});
+    rankWins:rankResult?.wins??null,leagueWin:leagueResult?.victory??null,event:g.pending.eventName||null,missedMatch:skipMatches});
   if(g.history.length>320)g.history.shift();
   g.pending=null;g.scene='result';
 }
@@ -252,8 +285,8 @@ function ageSeason(g) {
   if(g.career.season%2===0)g.player.age++;
 }
 function seasonAchievements(g,rng) {
-  const recent=g.career.scoreLog.slice(-8);
-  if(g.player.stage!=='student'&&recent.length>=6&&recent.filter(Boolean).length>=6 && rng()<.28) {
+  const recent=g.career.scoreLog.slice(-WEEKS_PER_SEASON);
+  if(g.player.stage!=='student'&&recent.length>=WEEKS_PER_SEASON&&recent.filter(Boolean).length>=WEEKS_PER_SEASON-1 && rng()<.25) {
     g.career.championships++;
     changeEffects(g,{popularity:9,teamwork:4});
     g.career.seasonAward=true;
@@ -263,8 +296,8 @@ export function continueFromResult(state,rng=Math.random) {
   if(state.scene!=='result')throw Error('경기 결과 화면이 아닙니다.');
   const g=copy(state);
   g.career.totalTurns++;
-  if(g.career.week<8){g.career.week++;g.scene='main';return g;}
-  // 8주 종료: 시즌 결산, 연봉 정산, 노화, 다음 시즌
+  if(g.career.week<WEEKS_PER_SEASON){g.career.week++;g.scene='main';return g;}
+  // 4주 종료: 시즌 결산, 연봉 정산, 노화, 다음 시즌
   seasonAchievements(g,rng);
   if(g.career.team&&g.career.contractRemaining>0) {
     g.career.totalSalary+=g.career.salary;
@@ -349,7 +382,7 @@ export function rejectOffer(state,offerId) {
 }
 export function careerScore(g) {
   return Math.round(g.rank.highest*90 + g.career.championships*130 + g.career.matchWins*5 +
-    g.career.totalTurns*.6 + g.status.popularity*1.6 + g.career.totalSalary*2);
+    g.career.totalTurns*1.2 + g.status.popularity*1.6 + g.career.totalSalary*2);
 }
 export function careerGrade(g) {
   const sc=careerScore(g);
@@ -368,8 +401,39 @@ export function hallEntry(g) {
     id:`${Date.now()}_${Math.random().toString(36).slice(2,7)}`,
     date:new Date().toISOString(),name:g.player.name,position:g.player.position,age:g.player.age,
     grade:g.ending?.grade||careerGrade(g),score:g.ending?.score||careerScore(g),
-    highest:g.rank.highest,stage:g.player.stage,trophies:g.career.championships,team:g.career.team,
+    highest:g.rank.highest,version:VERSION,stage:g.player.stage,trophies:g.career.championships,team:g.career.team,
     salary:g.career.totalSalary,
   };
 }
 export function formatMoney(amount) {return `${Number(amount||0).toLocaleString('ko-KR',{maximumFractionDigits:1})}억 원`;}
+
+/** 1.0 저장 파일을 2.0 규칙에 맞춰 변환합니다. 원본 객체는 변경하지 않습니다. */
+export function migrateGame(raw) {
+  if(!raw||!raw.player||!raw.career||!raw.rank)return null;
+  if(raw.version===VERSION)return raw;
+  if(raw.version!==1)return null;
+  const g=copy(raw);
+  const oldToNew=n=>n>=6?2:n===5?1:0;
+  const oldTier=Number(g.rank.tier)||0;
+  const oldLp=Number(g.rank.lp)||0;
+  g.rank.tier=oldToNew(oldTier);
+  g.rank.lp=([0,400,800][g.rank.tier]||0)+(oldTier>=4?oldLp:0);
+  g.rank.highest=oldToNew(Number(g.rank.highest)||0);
+  g.career.week=Math.max(1,Math.min(WEEKS_PER_SEASON,Math.ceil(g.career.week/2)));
+  g.career.recoveryTurns=0;g.career.recoveryReason=null;
+  if(g.pending?.week)g.pending.week=g.career.week;
+  if(g.lastResult?.week)g.lastResult.week=Math.max(1,Math.min(WEEKS_PER_SEASON,Math.ceil(g.lastResult.week/2)));
+  if(g.lastResult?.rank){
+    const r=g.lastResult.rank;
+    r.beforeTier=oldToNew(Number(r.beforeTier)||0);
+    r.afterTier=oldToNew(Number(r.afterTier)||0);
+    r.beforeLp=([0,400,800][r.beforeTier]||0)+(oldTier>=4?Number(r.beforeLp)||0:0);
+    r.afterLp=g.rank.lp;
+  }
+  g.version=VERSION;return g;
+}
+export const migrateHallEntry = entry => {
+  if(!entry||typeof entry!=='object')return entry;
+  if(entry.version===VERSION)return entry;
+  return {...entry,highest:entry.highest>=6?2:entry.highest===5?1:0,version:VERSION};
+};
