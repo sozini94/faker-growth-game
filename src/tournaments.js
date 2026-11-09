@@ -19,6 +19,34 @@ export const FOREIGN_TEAMS=[
  {id:'dig',name:'Dignitas',region:'LCS',strength:52},
  {id:'gam',name:'GAM Esports',region:'LCP',strength:57},
 ];
+// 국제대회에 참가하는 해외 구단의 로고 메타데이터.
+// 원본 이미지는 Leaguepedia의 팀 로고 프로필 파일을 참조합니다.
+// 링크가 차단/변경되면 게임에서 팀 약칭을 표시합니다.
+const logoFile = filename => `https://lol.fandom.com/wiki/Special:Redirect/file/${encodeURIComponent(filename)}`;
+const logoNames={
+ blg:['BLG','Bilibili Gaminglogo profile.png','#e59dff'],
+ tes:['TES','Top Esportslogo profile.png','#e0c778'],
+ g2:['G2','G2 Esportslogo profile.png','#e7e9ed'],
+ kc:['KC','Karmine Corplogo profile.png','#63baff'],
+ tl:['TL','Team Liquidlogo profile.png','#7bbdff'],
+ fly:['FLY','FlyQuestlogo profile.png','#86d791'],
+ tsw:['TSW','Team Secret Whaleslogo profile.png','#9dd9fe'],
+ dcg:['DCG','Deep Cross Gaminglogo profile.png','#c29bff'],
+ fur:['FUR','FURIAlogo profile.png','#f1f1e8'],
+ jdg:['JDG','JD Gaminglogo profile.png','#e6e6e6'],
+ fnc:['FNC','Fnaticlogo profile.png','#ffb06b'],
+ c9:['C9','Cloud9logo profile.png','#91caff'],
+ psg:['PSG','PSG Talonlogo profile.png','#b7c7ed'],
+ loud:['LOUD','LOUDlogo profile.png','#a9e78b'],
+ wbg:['WBG','Weibo Gaminglogo profile.png','#ed8791'],
+ koi:['KOI','Movistar KOIlogo profile.png','#e4a7e9'],
+ dig:['DIG','Dignitaslogo profile.png','#e6cf7c'],
+ gam:['GAM','GAM Esportslogo profile.png','#e8bc6f'],
+};
+export const INTERNATIONAL_TEAM_BRANDING=Object.fromEntries(FOREIGN_TEAMS.map(t=>{
+ const [short,file,color]=logoNames[t.id];
+ return [t.id,{...t,short,color,logo:logoFile(file),logoFile:file}];
+}));
 const clamp=(x,lo,hi)=>Math.min(hi,Math.max(lo,x));
 const order=['geng','hle','t1','dk','kt','bnk','ns','bro','drx','dn'];
 const strength=(id,playerTeam,playerPower,condition=70)=>{

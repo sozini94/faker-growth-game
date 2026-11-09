@@ -56,3 +56,12 @@
 .tournament-match>div{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
 .tournament-match>div b{color:#ffd681;margin:0 3px;}
 .tournament-match .win{color:#65e6b0;}
+
+/* v6: international MSI / Worlds team logos, including participant grids and results. */
+.international-team-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:8px;margin:11px 0}
+.international-team-item{display:flex;align-items:center;gap:8px;padding:8px;border:1px solid #405078;background:#141f38;border-radius:8px;min-width:0;font-size:12px;font-weight:700}
+.international-team-item .team-logo{flex:0 0 38px}
+.international-team-item span:last-child{overflow-wrap:anywhere}
+.tour-winner .team-logo,.pro-award p .team-logo,.tour-logs .team-logo{vertical-align:middle;display:inline-grid;width:31px;height:31px;margin:0 3px}
+.tournament-match .win .team-logo{width:24px;height:24px}
+@media(max-width:420px){.international-team-list{grid-template-columns:repeat(2,minmax(0,1fr))}.international-team-item{font-size:10px;padding:6px;gap:5px}.international-team-item .team-logo{flex-basis:30px;width:30px;height:30px}}

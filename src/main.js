@@ -6,7 +6,7 @@ import {
   seasonName,scorePower,averageStats,marketValue,meetsRequirements,
   isTrainingUnlocked,formatMoney,hallEntry,continueFromTournament
 } from './engine.js';
-import {PHASE_NAMES} from './tournaments.js';
+import {PHASE_NAMES,INTERNATIONAL_TEAM_BRANDING} from './tournaments.js';
 
 const APP_KEY='faker_growth_v1';
 const HALL_KEY='faker_growth_hall_v1';
@@ -39,7 +39,19 @@ let notice='';
 const h=val=>String(val??'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const img=name=>`/assets/${name}`;
 const seasonLabel=g=>g.player.stage==='pro'&&g.proCircuit?`${g.proCircuit.year}년차 · ${PHASE_NAMES[g.proCircuit.phase]}`:`${Math.ceil(g.career.season/2)}년차 ${seasonName(g.career.season)}`;
-const teamLogo=(id,small=false)=>{const t=teamInfo(id);return `<span class="team-logo ${small?'mini':''}" style="--team:${t.color}" title="${h(t.name)}"><img src="/assets/branding/team-${t.id}.${['t1','geng','hle','dk'].includes(t.id)?'svg':'png'}" data-remote="${h(t.logo)}" alt="${h(t.name)} 팀 로고" loading="lazy" onerror="brandFallback(this)"/><span class="team-logo-fallback" aria-hidden="true">${h(t.short)}</span></span>`};
+// 동일한 로고 컴포넌트로 LCK 10팀 + 국제대회 해외 18팀 처리.
+// 미등록 ID일 때 T1으로 대체하지 않고 ID 약칭으로 안전하게 표시합니다.
+const allTeams=[...TEAMS,...Object.values(INTERNATIONAL_TEAM_BRANDING)];
+const tournamentTeam=id=>allTeams.find(t=>t.id===id)||{id:String(id||'unknown'),name:String(id||'미정'),short:String(id||'?').slice(0,4).toUpperCase(),color:'#a6b5d5',logo:''};
+const teamLogo=(id,small=false)=>{
+ const t=tournamentTeam(id);
+ const isLocal=TEAMS.some(x=>x.id===id);
+ const ext=['t1','geng','hle','dk'].includes(id)?'svg':'png';
+ const file=isLocal?`team-${t.id}.${ext}`:`team-${t.id}.png`;
+ const src=`/assets/branding/${file}`;
+ const image=t.logo?`<img src="${h(src)}" data-remote="${h(t.logo)}" alt="${h(t.name)} 팀 로고" loading="lazy" onerror="brandFallback(this)"/>`:'';
+ return `<span class="team-logo ${small?'mini':''}" style="--team:${h(t.color)}" title="${h(t.name)}">${image}<span class="team-logo-fallback" aria-hidden="true" ${image?'':'style="display:grid"'}>${h(t.short)}</span></span>`;
+};
 const classForTier=n=>`tier-${TIERS[n]?.id||'iron'}`;
 const rangecolor=(n)=>n<28?'#f16a79':n<50?'#f3b75b':'#52e1c2';
 const valueText=n=>Number.isInteger(n)?n:n.toFixed(1);
@@ -161,13 +173,16 @@ function gateScreen(){
    <button class="choice-card muted" data-action="gate" data-choice="skip"><span class="choice-num">03</span><span class="choice-text"><b>이번 도전은 미룬다</b><small>현재 커리어 단계 유지 · 다음 주 또는 다음 시즌 재도전</small></span><span>➜</span></button></div>
  </div>`;
 }
-function teamName(id){return TEAMS.find(x=>x.id===id)?.name||({blg:'Bilibili Gaming',tes:'Top Esports',g2:'G2 Esports',kc:'Karmine Corp',tl:'Team Liquid',fly:'FlyQuest',tsw:'Team Secret Whales',dcg:'Deep Cross Gaming',fur:'FURIA',jdg:'JD Gaming',fnc:'Fnatic',c9:'Cloud9',psg:'PSG Talon',loud:'LOUD'})[id]||id||'미정';}
+function teamName(id){return tournamentTeam(id).name;}
+function teamBadges(ids){
+ return `<div class="international-team-list">${[...new Set(ids||[])].map(id=>`<div class="international-team-item">${teamLogo(id,true)}<span>${h(teamName(id))}</span></div>`).join('')}</div>`;
+}
 function standingsTable(rows){
  if(!rows?.length)return '<p class="soft">리그 결과를 집계하고 있습니다.</p>';
  return `<div class="standings-scroll"><table class="standings-table"><thead><tr><th>순위</th><th>팀</th><th>승</th><th>패</th></tr></thead><tbody>${rows.map(r=>`<tr class="${r.teamId===game.career.team?'my-team':''}"><td>${r.place}</td><td>${teamLogo(r.teamId,true)} ${h(teamName(r.teamId))}</td><td>${r.wins}</td><td>${r.losses}</td></tr>`).join('')}</tbody></table></div>`;
 }
 function matchLog(matches){
- return `<div class="tour-logs">${(matches||[]).map(m=>`<div class="tournament-match"><small class="match-stage">${h(m.stage||'BO5')}</small><div>${teamLogo(m.a,true)} ${h(teamName(m.a))} <b>${m.aWins} : ${m.bWins}</b> ${teamLogo(m.b,true)} ${h(teamName(m.b))}</div><small class="win">승리: ${h(teamName(m.winner))}</small></div>`).join('')}</div>`;
+ return `<div class="tour-logs">${(matches||[]).map(m=>`<div class="tournament-match"><small class="match-stage">${h(m.stage||'BO5')}</small><div>${teamLogo(m.a,true)} ${h(teamName(m.a))} <b>${m.aWins} : ${m.bWins}</b> ${teamLogo(m.b,true)} ${h(teamName(m.b))}</div><small class="win">승리: ${teamLogo(m.winner,true)} ${h(teamName(m.winner))}</small></div>`).join('')}</div>`;
 }
 function playoffStandings(ids){
  return `<div class="tour-logs">${ids.map((id,i)=>`<div><b>${i+1}위</b> ${teamLogo(id,true)} ${h(teamName(id))} ${i<3?`<span class="win">Worlds ${i+1}번 시드</span>`:''}</div>`).join('')}</div>`;
@@ -187,14 +202,16 @@ function tournamentScreen(){
  r.phase==='msi'?`<div class="${r.qualifiedWorlds?'positive-note':'warning-note'}">${r.qualifiedWorlds?'Worlds 출전 확정!':'Worlds 진출 실패 · LCK 성적이 부족합니다.'}</div>`:
  `<div class="${r.won?'positive-note':'warning-note'}">${r.won?`🏆 Worlds 우승! ${r.streak}년 연속 우승`:'이번 해의 Worlds 도전이 끝났습니다. 다음 해에 다시 도전하세요.'}</div>`;
  return `<div class="page-body"><div class="wide-banner" style="background-image:linear-gradient(180deg,transparent,#09142a),url('${img('team-arena.webp')}')"><div class="banner-overlay"><span class="eyebrow">PRO TOURNAMENT · YEAR ${r.year}</span><h2>${h(r.title)}</h2><p>${h(intro)}</p></div></div>
- ${section(`${labelHeading('🏆','대회 결산')}<h2 class="tournament-title">${r.phase==='lck'?'LCK / ROAD TO MSI':r.phase==='msi'?'MID-SEASON INVITATIONAL':'WORLD CHAMPIONSHIP'}</h2>${qualification}${champion?`<p class="tour-winner">우승 팀 · <strong>${h(teamName(champion))}</strong></p>`:''}${r.phase==='lck'?`<p>MSI 대표: ${(r.qualifiers||[]).map(x=>h(teamName(x))).join(' · ')}</p>`:''}${r.phase==='msi'?`<p>LCK 우승: ${h(teamName(r.lckChampion))}</p><p>Worlds 출전권: ${(r.worldsSeeds||[]).map(x=>h(teamName(x))).join(' · ')}</p>`:''}${r.phase==='worlds'?`<p>나의 Worlds 우승 ${t.worldsWins}회 · 4년 연속 우승 목표</p>`:''}`,'pro-award')}
+ ${section(`${labelHeading('🏆','대회 결산')}<h2 class="tournament-title">${r.phase==='lck'?'LCK / ROAD TO MSI':r.phase==='msi'?'MID-SEASON INVITATIONAL':'WORLD CHAMPIONSHIP'}</h2>${qualification}${champion?`<p class="tour-winner">우승 팀 · ${teamLogo(champion,true)} <strong>${h(teamName(champion))}</strong></p>`:''}${r.phase==='lck'?`<p>MSI 대표</p>${teamBadges(r.qualifiers)}`:''}${r.phase==='msi'?`<p>LCK 우승: ${teamLogo(r.lckChampion,true)} ${h(teamName(r.lckChampion))}</p><p>Worlds 출전권</p>${teamBadges(r.worldsSeeds)}`:''}${r.phase==='worlds'?`<p>나의 Worlds 우승 ${t.worldsWins}회 · 4년 연속 우승 목표</p>`:''}`,'pro-award')}
  ${r.standings?.length?section(`${labelHeading('⚑',r.phase==='lck'?'LCK 10팀 전반기 순위':'LCK 후반기 정규시즌 순위 (플레이오프와 별도)')} ${standingsTable(r.standings)}`):''}
- ${r.phase==='lck'&&r.road?.length?section(`${labelHeading('⚔','ROAD TO MSI 선발전')}<div class="tour-logs">${r.road.map(m=>`<div>${h(teamName(m.a))} ${h(m.aWins)} : ${h(m.bWins)} ${h(teamName(m.b))} · <strong>${h(teamName(m.winner))} 승</strong></div>`).join('')}</div>`):''}
- ${r.phase==='msi'&&r.msiPlayIn?.length?section(`${labelHeading('⚔','MSI 플레이인 · 4팀에서 1팀 선발')}<p class="soft">플레이인 통과: <b>${h(teamName(r.msiPlayInWinner))}</b> · 이후 8팀 본선</p>${matchLog(r.msiPlayIn)}`):''}
+ ${r.phase==='msi'&&r.msiField?.length?section(`${labelHeading('🌐','MSI 참가팀 · 총 11팀')}${teamBadges(r.msiField)}`):''}
+ ${r.phase==='worlds'&&r.participants?.length?section(`${labelHeading('🌍','Worlds 참가팀 · 총 19팀')}${teamBadges(r.participants)}`):''}
+ ${r.phase==='lck'&&r.road?.length?section(`${labelHeading('⚔','ROAD TO MSI 선발전')}<div class="tour-logs">${r.road.map(m=>`<div>${teamLogo(m.a,true)} ${h(teamName(m.a))} ${h(m.aWins)} : ${h(m.bWins)} ${teamLogo(m.b,true)} ${h(teamName(m.b))} · <strong>${teamLogo(m.winner,true)} ${h(teamName(m.winner))} 승</strong></div>`).join('')}</div>`):''}
+ ${r.phase==='msi'&&r.msiPlayIn?.length?section(`${labelHeading('⚔','MSI 플레이인 · 4팀에서 1팀 선발')}<p class="soft">플레이인 통과: <b>${teamLogo(r.msiPlayInWinner,true)} ${h(teamName(r.msiPlayInWinner))}</b> · 이후 8팀 본선</p>${matchLog(r.msiPlayIn)}`):''}
  ${r.phase==='msi'&&r.msiBracket?.length?section(`${labelHeading('⚔','MSI 8팀 본선 · BO5')} ${matchLog(r.msiBracket)}`):''}
  ${r.phase==='msi'&&r.lckPlayoffs?.length?section(`${labelHeading('⚔','LCK 플레이오프 · 경기별 대진과 승패')}<p class="soft">정규시즌 상위 6팀 참가 · 결승 승자가 LCK 우승 · 최종 1~3위 Worlds 출전</p>${matchLog(r.lckPlayoffs)}`):''}
  ${r.phase==='msi'&&r.lckPlacement?.length?section(`${labelHeading('🏅','LCK 플레이오프 최종 순위 · Worlds 시드')} ${playoffStandings(r.lckPlacement)}<p class="soft">추가 시드는 MSI 우승/준우승 지역 성적에 따라 적용됩니다.</p>`):''}
- ${r.phase==='worlds'&&r.knockout?.length?section(`${labelHeading('⚔','Worlds 8강~결승')}<div class="tour-logs">${r.knockout.map(m=>`<div>${h(teamName(m.a))} ${m.score} ${h(teamName(m.b))} · <strong>${h(teamName(m.winner))} 승</strong></div>`).join('')}</div>`):''}
+ ${r.phase==='worlds'&&r.knockout?.length?section(`${labelHeading('⚔','Worlds 8강~결승')}<div class="tour-logs">${r.knockout.map(m=>`<div>${teamLogo(m.a,true)} ${h(teamName(m.a))} ${m.score} ${teamLogo(m.b,true)} ${h(teamName(m.b))} · <strong>${teamLogo(m.winner,true)} ${h(teamName(m.winner))} 승</strong></div>`).join('')}</div>`):''}
  ${r.phase==='worlds'&&r.won&&r.streak>=4?'<div class="faker-banner">👑 4년 연속 Worlds 우승! 페이커 특별 엔딩 해금</div>':''}
  <button class="btn primary full next-button" data-action="next-tournament">${r.phase==='worlds'&&r.won&&r.streak>=4?'페이커 엔딩 보기 →':r.phase==='worlds'?'다음 해 LCK 도전 →':r.phase==='lck'?'MSI 시즌으로 →':'Worlds 시즌으로 →'}</button>
  <p class="fine-print">2026년 출전 자격 구조를 3주 시즌으로 축약한 게임용 모의 대회입니다. 실제 리그 전 경기 일정·대진·성적과 동일하지 않습니다.</p></div>`;

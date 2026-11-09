@@ -3,12 +3,14 @@ import {mkdir,writeFile} from 'node:fs/promises';
 import {fileURLToPath} from 'node:url';
 import path from 'node:path';
 import {TEAMS,TIERS} from '../src/engine.js';
+import {INTERNATIONAL_TEAM_BRANDING} from '../src/tournaments.js';
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const dir=path.join(root,'public/assets/branding');
 await mkdir(dir,{recursive:true});
 const list=[
  ...TIERS.map(t=>({name:t.name,url:t.logo,file:`rank-${t.id}.png`})),
  ...TEAMS.map(t=>({name:t.name,url:t.logo,file:`team-${t.id}.${['t1','geng','hle','dk'].includes(t.id)?'svg':'png'}`})),
+ ...Object.values(INTERNATIONAL_TEAM_BRANDING).map(t=>({name:t.name,url:t.logo,file:`team-${t.id}.png`})),
 ];
 let succeeded=0;const failures=[];
 for(const item of list){
