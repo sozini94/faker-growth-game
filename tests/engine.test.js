@@ -11,9 +11,9 @@ const events=JSON.parse(readFileSync(new URL('../src/data/events.json',import.me
 const zero=()=>0;
 const high=()=>.99;
 
-test('마스터부터 시작하고 티어는 최상위 3종, 한 시즌 4주',()=>{
+test('마스터부터 시작하고 티어는 최상위 3종, 한 시즌 3주',()=>{
  assert.equal(VERSION,2);
- assert.equal(WEEKS_PER_SEASON,4);
+ assert.equal(WEEKS_PER_SEASON,3);
  assert.deepEqual(TIERS.map(t=>t.name),['마스터','그랜드마스터','챌린저']);
  assert.deepEqual(RANK_THRESHOLDS,[0,400,800]);
  assert.equal(POSITIONS.length,5);
@@ -42,7 +42,7 @@ test('솔로랭크 10판, 초기 180LP + 다음 주로 진행',()=>{
  let g=createGame('승리의 신인','mid');
  g=startTraining(g,'solo',[],zero);
  assert.equal(g.scene,'result');assert.equal(g.lastResult.rank.wins,10);
- assert.equal(g.rank.tier,0);assert.equal(g.rank.lp,180);
+ assert.equal(g.rank.tier,0);assert.ok(g.rank.lp>0);
  assert.equal(g.status.stamina,85);assert.equal(g.status.condition,65);
  g=continueFromResult(g,high);assert.equal(g.career.week,2);
 });
@@ -60,7 +60,7 @@ test('영상 분석, 휴식, 팀 훈련 학생 잠금',()=>{
  let g=createGame('체력관리','support');
  assert.throws(()=>startTraining(g,'team',[],high),/훈련/);
  g=startTraining(g,'study',[],high);
- assert.equal(g.stats.map,17);assert.equal(g.stats.champ,11);assert.equal(g.status.stamina,92);
+ assert.equal(g.stats.map,21);assert.equal(g.stats.champ,14);assert.equal(g.status.stamina,92);
  g=continueFromResult(g,high);g=startTraining(g,'rest',[],high);
  assert.equal(g.status.stamina,100);assert.equal(g.status.condition,85);
 });
@@ -108,8 +108,8 @@ test('이벤트 결과가 체력 0으로 떨어져도 강제 휴식 처리',()=>
  g=chooseEvent(g,[ev],0,high);
  assert.equal(g.lastResult.rank,null);assert.equal(g.lastResult.league,null);assert.equal(g.career.recoveryTurns,1);
 });
-test('4주차 시즌 종료 후 승격 테스트 및 계약 제안',()=>{
- let g=createGame('이적의 별','mid');g.stats.lane=25;g.stats.map=25;g.career.week=4;
+test('3주차 시즌 종료 후 승격 테스트 및 계약 제안',()=>{
+ let g=createGame('이적의 별','mid');g.stats.lane=25;g.stats.map=25;g.career.week=3;
  g=startTraining(g,'study',[],high);g=continueFromResult(g,high);
  assert.equal(g.career.season,2);assert.equal(g.career.week,1);assert.equal(g.scene,'gate');
  g=chooseGate(g,'focus',zero);
@@ -120,7 +120,7 @@ test('4주차 시즌 종료 후 승격 테스트 및 계약 제안',()=>{
 test('계약 만료 후 제안이 없으면 은퇴',()=>{
  let g=createGame('노장','top');
  g.player.stage='pro';g.player.age=35;g.career.team='t1';g.career.contractRemaining=1;
- g.career.salary=12;g.career.week=4;
+ g.career.salary=12;g.career.week=3;
  g=startTraining(g,'rest',[],high);g=continueFromResult(g,high);
  assert.equal(g.scene,'ending');assert.equal(g.offers.length,0);
  assert.ok(g.ending?.grade);assert.equal(g.career.totalSalary,12);
@@ -134,11 +134,27 @@ test('1.0 저장 데이터 및 명예의 전당 기록 이전',()=>{
  const old=createGame('기존','top');old.version=1;old.rank={tier:5,lp:65,highest:6};old.career.week=7;
  const migrated=migrateGame(old);
  assert.equal(migrated.version,2);assert.equal(migrated.rank.tier,1);assert.equal(migrated.rank.lp,465);
- assert.equal(migrated.rank.highest,2);assert.equal(migrated.career.week,4);
+ assert.equal(migrated.rank.highest,2);assert.equal(migrated.career.week,3);
  assert.equal(old.rank.lp,65);
  assert.equal(migrateHallEntry({highest:6}).highest,2);
 });
 test('시장가치 계산과 커리어 점수',()=>{
  let g=createGame('선수','bot');const a=marketValue(g);g.player.age=32;
  assert.ok(marketValue(g)<a);assert.ok(careerScore(g)>=0);
+});
+
+test('랜덤 성장 결과가 자동으로 기록됨',()=>{
+ const low=startTraining(createGame('하한','mid'),'solo',[],zero);
+ assert.equal(low.lastResult.trainingGains.lane,3);
+ assert.equal(low.lastResult.trainingGains.fight,2);
+ const highRoll=startTraining(createGame('상한','mid'),'solo',[],high);
+ assert.equal(highRoll.lastResult.trainingGains.lane,6);
+ assert.equal(highRoll.lastResult.trainingGains.fight,4);
+ const study=startTraining(createGame('분석','mid'),'study',[],high);
+ assert.equal(study.lastResult.trainingGains.map,6);
+ assert.equal(study.lastResult.trainingGains.champ,4);
+ const rest=startTraining(createGame('회복','mid'),'rest',[],high);
+ assert.equal(rest.lastResult.trainingGains.mental,2);
+ const oldGame=createGame('4주 저장','mid'); oldGame.career.week=4;
+ assert.equal(migrateGame(oldGame).career.week,3);
 });

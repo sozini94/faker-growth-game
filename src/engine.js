@@ -1,6 +1,6 @@
 /** 게임 규칙/상태 변경만 담당하는 모듈. DOM과 localStorage에 의존하지 않습니다. */
 export const VERSION = 2;
-export const WEEKS_PER_SEASON = 4;
+export const WEEKS_PER_SEASON = 3;
 export const RANK_THRESHOLDS = [0,400,800];
 export const TIERS = [
   {id:'master',name:'마스터',color:'#b58aff',symbol:'✦',minLp:0,
@@ -52,10 +52,10 @@ export const STAGES = [
   {id:'pro',name:'1군',next:null,gateTier:2,gatePower:100},
 ];
 export const TRAININGS = [
-  {id:'solo',name:'솔로랭크',icon:'⚔',desc:'10게임 일괄 진행 · 티어 상승',className:'red',effects:{lane:2,fight:1,stamina:-15,condition:-5}},
-  {id:'study',name:'영상 분석',icon:'▣',desc:'맵 리딩 +2 · 챔프폭 +1',className:'blue',effects:{map:2,champ:1,stamina:-8}},
-  {id:'team',name:'팀 연습',icon:'♟',desc:'한타 +2 · 팀워크 +3',className:'purple',effects:{fight:2,teamwork:3,stamina:-15},requiresTeam:true},
-  {id:'rest',name:'휴식',icon:'☾',desc:'체력 +30 · 컨디션 +15 · 멘탈 +1',className:'green',effects:{stamina:30,condition:15,mental:1}},
+  {id:'solo',name:'솔로랭크',icon:'⚔',desc:'라인전 +3~6 · 한타 +2~4 · 랭크 10판',className:'red',effects:{lane:2,fight:1,stamina:-15,condition:-5}},
+  {id:'study',name:'영상 분석',icon:'▣',desc:'맵 리딩 +3~6 · 챔프폭 +2~4',className:'blue',effects:{map:2,champ:1,stamina:-8}},
+  {id:'team',name:'팀 연습',icon:'♟',desc:'한타 +3~6 · 팀워크 +3',className:'purple',effects:{fight:2,teamwork:3,stamina:-15},requiresTeam:true},
+  {id:'rest',name:'휴식',icon:'☾',desc:'체력 +30 · 컨디션 +15 · 멘탈 +1~2',className:'green',effects:{stamina:30,condition:15,mental:1}},
 ];
 const CAP = 100;
 const MIN = 0;
@@ -218,7 +218,28 @@ export function startTraining(state,trainingId,events=[],rng=Math.random) {
   const forcedRecovery=g.career.recoveryTurns>0||g.status.stamina<=0||g.status.condition<=0;
   g.pending={trainingId,week:g.career.week,season:g.career.season,forcedRecovery,
     before:{stats:copy(g.stats),status:copy(g.status),rank:copy(g.rank)},eventName:null};
-  changeEffects(g,tr.effects);
+  const effects = {...tr.effects};
+
+  if (trainingId === 'solo') {
+      effects.lane = roll(rng, 3, 6);
+      effects.fight = roll(rng, 2, 4);
+
+  } else if (trainingId === 'study') {
+      effects.map = roll(rng, 3, 6);
+      effects.champ = roll(rng, 2, 4);
+
+  } else if (trainingId === 'team') {
+      effects.fight = roll(rng, 3, 6);
+
+  } else if (trainingId === 'rest') {
+      effects.mental = roll(rng, 1, 2);
+  }
+
+  changeEffects(g, effects);
+  // 나이 보정과 스탯 상한을 적용한 실제 훈련 성장량.
+  g.pending.trainingGains=Object.fromEntries(playerKeys.map(key=>[
+    key,Math.round((g.stats[key]-g.pending.before.stats[key])*10)/10
+  ]));
   if(forcedRecovery){
     // 0에서 정상 복귀할 수 있도록 일반 휴식보다 추가 회복을 제공.
     changeEffects(g,{stamina:10,condition:15});
@@ -263,7 +284,7 @@ function concludeTraining(g,rng) {
   syncValue(g);
   g.lastResult={
     trainingId:g.pending.trainingId,season:g.career.season,week:g.career.week,
-    rank:rankResult,league:leagueResult,missedMatch:skipMatches,forcedRecovery:Boolean(g.pending.forcedRecovery),
+    rank:rankResult,league:leagueResult,trainingGains:g.pending.trainingGains||null,missedMatch:skipMatches,forcedRecovery:Boolean(g.pending.forcedRecovery),
     recoveryNote:reason,eventName:g.pending.eventName,eventChoice:g.pending.eventChoice,
     gains:{stats:Object.fromEntries(playerKeys.map(k=>[k,Math.round((g.stats[k]-g.pending.before.stats[k])*10)/10])),
       status:Object.fromEntries(statusKeys.map(k=>[k,Math.round((g.status[k]-g.pending.before.status[k])*10)/10]))},
@@ -410,7 +431,14 @@ export function formatMoney(amount) {return `${Number(amount||0).toLocaleString(
 /** 1.0 저장 파일을 2.0 규칙에 맞춰 변환합니다. 원본 객체는 변경하지 않습니다. */
 export function migrateGame(raw) {
   if(!raw||!raw.player||!raw.career||!raw.rank)return null;
-  if(raw.version===VERSION)return raw;
+  if(raw.version===VERSION){
+    if(raw.career.week<=WEEKS_PER_SEASON)return raw;
+    const g=copy(raw);
+    g.career.week=WEEKS_PER_SEASON;
+    if(g.pending?.week>WEEKS_PER_SEASON)g.pending.week=WEEKS_PER_SEASON;
+    if(g.lastResult?.week>WEEKS_PER_SEASON)g.lastResult.week=WEEKS_PER_SEASON;
+    return g;
+  }
   if(raw.version!==1)return null;
   const g=copy(raw);
   const oldToNew=n=>n>=6?2:n===5?1:0;

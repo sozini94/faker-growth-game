@@ -42,3 +42,7 @@
 .tiers-strip .tier-step.current{opacity:1}
 .recovery-warning{background:linear-gradient(90deg,#603139,#342034);border:1px solid #ff7894;border-radius:9px;color:#ffdee4;font-weight:750;font-size:12px;padding:12px 14px;line-height:1.65}
 .rank-main{min-width:0}.rank-main>div:last-child{min-width:0}.rank-main span{line-height:1.4}
+
+/* Random training outcomes */
+.random-growth-box{margin:12px 0;padding:12px;border:1px solid #9475dd;border-radius:9px;background:linear-gradient(120deg,#261d42,#12243e)}
+.random-growth-box>b{display:block;margin-bottom:8px;color:#f6dbff;font-size:13px}
