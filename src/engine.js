@@ -225,7 +225,7 @@ function simulateSolo(g,rng) {
   for(let i=0;i<10;i++) {
     const opponent=13+g.rank.tier*10+g.rank.lp*.032;
     const win=rng()<winChance(scorePower(g),opponent,g.status.condition);
-    if(win){wins++;g.career.rankWins++;updateRank(g,roll(rng,20,40));}
+    if(win){wins++;g.career.rankWins++;updateRank(g,roll(rng,20,30));}
     else {losses++;g.career.rankLosses++;updateRank(g,-roll(rng,15,20));}
   }
   const promotion=g.rank.tier>beforeTier, demotion=g.rank.tier<beforeTier;
