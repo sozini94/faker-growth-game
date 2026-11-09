@@ -37,7 +37,7 @@
 .rank-crest.large{width:95px;height:95px;min-width:95px}
 .rank-crest.large .rank-crest-fallback{font-size:45px}
 .tiny-rank{height:46px;display:grid;place-items:center;font-size:initial;text-shadow:none}
-.tiny-rank .rank-crest.small{width:47px;height:47px;min-width:47px}
+.tiny-rank .rank-crest.small{width:110px;height:90px;min-width:47px}
 .tiers-strip .tier-step{flex:1 0 92px;min-width:92px;opacity:.85}
 .tiers-strip .tier-step.current{opacity:1}
 .recovery-warning{background:linear-gradient(90deg,#603139,#342034);border:1px solid #ff7894;border-radius:9px;color:#ffdee4;font-weight:750;font-size:12px;padding:12px 14px;line-height:1.65}
